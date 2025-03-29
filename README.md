@@ -10,5 +10,5 @@ Visual Studio Code
 Python 3.10.16
 
 # TODO:
-- load in train /t est /val distribtues for join d-fire nad places dataset
+- load in train / test / val distributions for join d-fire and places dataset
 - get testing video feeds of fires for interfernce

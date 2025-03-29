@@ -1,0 +1,8 @@
+*.zip
+*.swp
+D-Fire/*
+fire_videos/*
+*.tar
+train_256*
+FIRE_*
+data_256/*
