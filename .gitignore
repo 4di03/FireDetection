@@ -9,3 +9,4 @@ data_256/*
 *.zip
 Fire_Detection.v1i.coco/
 .DS_Store
+__pycache__/
