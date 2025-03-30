@@ -6,3 +6,6 @@ fire_videos/*
 train_256*
 FIRE_*
 data_256/*
+*.zip
+Fire_Detection.v1i.coco/
+.DS_Store
