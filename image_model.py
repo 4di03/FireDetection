@@ -1,3 +1,10 @@
+"""
+Adithya Palle 
+March 30, 2025 
+Final Project
+
+File containing interface for image models that predict fire probability for a given image.
+"""
 import torch
 from abc import ABC, abstractmethod
 

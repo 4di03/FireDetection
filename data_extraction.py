@@ -21,9 +21,12 @@ VideoData = List[torch.Tensor]
 
 
 
-def get_video_data() -> Tuple[torch.Tensor, torch.Tensor]:
+def get_video_data(videos_path : str =FIRE_VIDEOS_DATA_PATH + "/validation" ) -> Tuple[torch.Tensor, torch.Tensor]:
     """
     reads videos from directory and returns a tuple of tensors containing image data.
+    Args:
+        videos_path (str): The path to the directory containing the videos.
+        The directory should contain two subdirectories: "pos" and "neg" in which pos contains videos with fire and neg contains videos without fire.
     Returns:
         Tuple[torch.Tensor, torch.Tensor]: A tuple containing two lists of tensors:
             - The first list contains tensors representing videos with fire.
@@ -31,14 +34,14 @@ def get_video_data() -> Tuple[torch.Tensor, torch.Tensor]:
     """
     pos_videos = []
 
-    for pos_video in os.listdir(os.path.join(FIRE_VIDEOS_DATA_PATH, "pos")):
-        pos_video_path = os.path.join(FIRE_VIDEOS_DATA_PATH, "pos", pos_video)
+    for pos_video in os.listdir(os.path.join(videos_path, "pos")):
+        pos_video_path = os.path.join(videos_path, "pos", pos_video)
         frames, _, _ = torchvision.io.read_video(pos_video_path)  # frames: [T, H, W, C]
         pos_videos.append(frames)  # Append the frames tensor to the list
 
     neg_videos = []
-    for neg_video in os.listdir(os.path.join(FIRE_VIDEOS_DATA_PATH, "neg")):
-        neg_video_path = os.path.join(FIRE_VIDEOS_DATA_PATH, "neg", neg_video)
+    for neg_video in os.listdir(os.path.join(videos_path, "neg")):
+        neg_video_path = os.path.join(videos_path, "neg", neg_video)
         frames, _, _ = torchvision.io.read_video(neg_video_path)  # frames: [T, H, W, C]
         neg_videos.append(frames)  # Append the frames tensor to the list
 
