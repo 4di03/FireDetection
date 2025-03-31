@@ -256,7 +256,7 @@ def train_cnn(model_and_transform :ModelWithTransform ,
     return train_loss_plot, val_loss_plot, model
 
 
-def init_training_params(model : torch.nn.Module) -> TrainingParameters:
+def init_training_params(model : torch.nn.Module, device : torch.device) -> TrainingParameters:
     """
     Get default training parameters for the CNN model.
     Returns:
@@ -268,7 +268,8 @@ def init_training_params(model : torch.nn.Module) -> TrainingParameters:
         loss_function=torch.nn.BCEWithLogitsLoss(), # Binary Classification Loss that automatically applies sigmoid
         batch_size=32,
         n_epochs=10,
-        early_stopping_threshold=0
+        early_stopping_threshold=0,
+        device = device
     )
 
 

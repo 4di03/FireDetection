@@ -11,7 +11,7 @@ DFIRE_DATA_PATH = "D-Fire"
 PLACES_DATA_PATH = "data_256"
 FIRE_DATA_PATH = "fire_dataset"
 FIRE_VIDEOS_DATA_PATH = "fire_videos.1406"
-FIRE_IMAGE_DATA_PATH = "Fire_Detection.v1i.coco/train/"
+FIRE_IMAGE_DATA_PATH = "Fire_Detection.v1.coco/train/"
 
 # image data which is an image tensor and a boolean (True if fire, False if no fire) for each image
 ImageData = List[Tuple[torch.Tensor, bool]]

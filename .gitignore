@@ -7,7 +7,7 @@ train_256*
 FIRE_*
 data_256/*
 *.zip
-Fire_Detection.vl1.coco/
+Fire_Detection.v1.coco/
 .DS_Store
 __pycache__/
 data/*
