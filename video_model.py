@@ -8,6 +8,7 @@ File containing Abstract class for image models that predict fire probability in
 import torch
 from abc import ABC, abstractmethod
 from typing import List
+from image_model import ImageModel
 
 class VideoModel(ABC):
     """
@@ -46,3 +47,13 @@ class VideoModel(ABC):
             predictions.append(prediction)
         return predictions
 
+
+class VideoModelFromImageModel(VideoModel):
+    """
+    A wrapper class that allows an image model to be used as a video model.
+    """
+    def __init__(self, image_model : ImageModel):
+        self.image_model = image_model
+
+    def predict_on_last_frame(self, frames : List[torch.tensor]) -> float:
+        return self.image_model.predict(frames[-1])
