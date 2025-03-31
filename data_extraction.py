@@ -7,9 +7,9 @@ import torchvision.transforms.functional as F
 import random
 
 
-DFIRE_DATA_PATH = "D-Fire"
+#DFIRE_DATA_PATH = "D-Fire"
 PLACES_DATA_PATH = "data_256"
-FIRE_DATA_PATH = "fire_dataset"
+#FIRE_DATA_PATH = "fire_dataset"
 FIRE_VIDEOS_DATA_PATH = "fire_videos"
 FIRE_IMAGE_DATA_PATH = "Fire_Detection.v1.coco/train/"
 
@@ -104,7 +104,7 @@ def get_image_data(n_total_samples = 1000) -> Tuple[ImageData, ImageData, ImageD
     # get complete dataset (random sample of n_total_samples images) such that 50% are fire and 50% are no fire
     num_fire_images = n_total_samples // 2
 
-    fire_jpg_files = get_random_img_file_data(FIRE_DATA_PATH, num_fire_images)
+    fire_jpg_files = get_random_img_file_data(FIRE_IMAGE_DATA_PATH, num_fire_images)
     num_fire_images = len(fire_jpg_files)
 
     fire_images =  list(zip(fire_jpg_files, [True] * num_fire_images))
