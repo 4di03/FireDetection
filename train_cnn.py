@@ -16,10 +16,13 @@ import matplotlib.pyplot as plt
 from torchvision import transforms
 from torch.utils.data import Dataset
 import torch.nn.functional as F
-
+import cv2
 # preprocessing step for images
 TARGET_IMAGE_SIZE = 224
-TRANSFORM = transforms.Compose([ # resize to 224x224
+TRANSFORM = transforms.Compose([ 
+                                # conver to float tensor in range [0,1]
+                                transforms.Lambda(lambda x: x.float()/255.0),
+                                # resize to 224x224
                                 transforms.Lambda(lambda x: 
                                                   F.interpolate(x.unsqueeze(0), 
                                                                 size=(TARGET_IMAGE_SIZE, TARGET_IMAGE_SIZE), 
@@ -31,32 +34,53 @@ TRANSFORM = transforms.Compose([ # resize to 224x224
 
 # TODO: consider recalcualating mean and std for the dataset if these do not work well
 
-def init_torch_model() -> torch.nn.Module:
-    """
-    Factory method for a CNN used for binary classification for fire detection.
-    The model should not output sigmoid at the end since we use BCEWithLogitsLoss, this is purely a training model
-    and the actual inference model is a sequential model with the sigmoid at the end created in the train_cnn function.
-    Returns:
-        torch.nn.Module: A PyTorch model for fire detection.
-    """
-    size_after_first_conv = (TARGET_IMAGE_SIZE - 3 + 1)
-    size_after_first_pool = size_after_first_conv // 2
-    size_after_second_conv = (size_after_first_pool - 3 + 1)
-    size_after_second_pool = size_after_second_conv // 2
-    size_after_flatten = size_after_second_pool * size_after_second_conv
+class TrainingModel(torch.nn.Module):
 
-    return torch.nn.Sequential(
-        torch.nn.Conv2d(3, 16, kernel_size=3, stride=1),
-        torch.nn.MaxPool2d(kernel_size=2, stride=2),
-        torch.nn.ReLU(),
-        torch.nn.Conv2d(16, 32, kernel_size=3, stride=1),
-        torch.nn.MaxPool2d(kernel_size=2, stride=2),
-        torch.nn.ReLU(),
-        torch.nn.Flatten(),
-        torch.nn.Linear(size_after_flatten, 128),
-        torch.nn.ReLU(),
-        torch.nn.Linear(128, 1) # dont use sigmoid at the end since we use BCEWithLogitsLoss
-    )
+    def __init__(self):
+        """
+        Initialize the TrainingModel with a pre-trained model.
+        
+        Args:
+            model: A pre-trained CNN model for fire detection.
+        """
+        super(TrainingModel, self).__init__()
+        self.conv1 = torch.nn.Conv2d(3, 16, kernel_size=3, stride=1)
+        self.conv2 = torch.nn.Conv2d(16, 32, kernel_size=3, stride=1)
+        self.fc1 = torch.nn.Linear(32 * 54 * 54, 128)  # Adjusted input size
+        self.fc2 = torch.nn.Linear(128, 1)  # Output size for binary classification
+        self.net = torch.nn.Sequential(
+            self.conv1,
+            torch.nn.MaxPool2d(kernel_size=2, stride = 2),
+            torch.nn.ReLU(),
+            self.conv2,
+            torch.nn.MaxPool2d(kernel_size=2, stride = 2),
+            torch.nn.ReLU(),
+            torch.nn.Flatten(),
+            self.fc1,
+            torch.nn.ReLU(),
+            self.fc2,
+        )
+
+    def forward(self, x):
+        return self.net(x)
+    
+
+class InferenceModel(torch.nn.Module):
+
+    def __init__(self, trained_model : TrainingModel):
+        """
+        Initialize the InferenceModel with a pre-trained model.
+        
+        Args:
+            model: A pre-trained CNN model for fire detection.
+        """
+        super(InferenceModel, self).__init__()
+        self.trained_model = trained_model
+    def forward(self, x):
+        return torch.sigmoid(self.model(x))
+
+
+
 
 @dataclasses.dataclass
 class TrainingParameters:
@@ -64,7 +88,7 @@ class TrainingParameters:
     loss_function : torch.nn.Module
     batch_size : int
     n_epochs : int
-    early_stopping_threshold : float = 0.01 # threshold for which we stop trianing if loss is less change is less than this for consecutive epochs where loss is decreasing
+    early_stopping_threshold : float = 1e-3 # threshold for which we stop trianing if loss is less change is less than this for consecutive epochs where loss is decreasing, set to 0 to disable
 
 
 @dataclasses.dataclass
@@ -99,7 +123,7 @@ def get_total_avg_loss(network : torch.nn.Module,
     with torch.no_grad():
         for test_images, test_labels in dataloader:
             test_output = network(test_images)
-            total_loss += loss_function(test_output, test_labels).item()
+            total_loss += loss_function(test_output.squeeze(1), test_labels).item()
 
     return total_loss / total_batches   
 @dataclasses.dataclass
@@ -185,7 +209,8 @@ def train_cnn(model_and_transform :ModelWithTransform ,
 
             output = model(train_images)  # forward pass on training data
 
-            train_loss = training_parameters.loss_function(output, train_labels)  # calculate loss
+
+            train_loss = training_parameters.loss_function(output.squeeze(1), train_labels)  # calculate loss
             train_loss.backward()  # backpropagation
             training_parameters.optimizer.step()  # update weights
 
@@ -204,7 +229,8 @@ def train_cnn(model_and_transform :ModelWithTransform ,
         print(f"Epoch {epoch_index + 1} completed. Train loss: {cur_epoch_train_loss:.4f}, Validation loss: {val_losses[-1]:.4f}")
 
         # compare with previous val loss for early stopping
-        if epoch_index > 0 and  val_losses[-1] < val_losses[-2] and val_losses[-2] - val_losses[-1] < training_parameters.early_stopping_threshold:
+        if epoch_index > 0 and val_losses[-2] >=  val_losses[-1]  and (val_losses[-2] - val_losses[-1]) <= training_parameters.early_stopping_threshold:
+            print(val_losses[-2] - val_losses[-1], training_parameters.early_stopping_threshold, (val_losses[-2] - val_losses[-1]) <= training_parameters.early_stopping_threshold)
             print("Early stopping")
             break
 
@@ -212,10 +238,7 @@ def train_cnn(model_and_transform :ModelWithTransform ,
     train_loss_plot = XYData(x=range(len(train_losses)), y=train_losses)
     val_loss_plot = XYData(x=range(len(val_losses)), y=val_losses)
 
-    inference_model = torch.nn.Sequential(
-        model,
-        torch.nn.Sigmoid() # apply sigmoid to the output for binary classification
-    )
+    inference_model = InferenceModel(model)
 
     model = CNNFireDetector(inference_model)
 
@@ -234,7 +257,7 @@ def init_training_params(model : torch.nn.Module) -> TrainingParameters:
         loss_function=torch.nn.BCEWithLogitsLoss(), # Binary Classification Loss that automatically applies sigmoid
         batch_size=32,
         n_epochs=10,
-        early_stopping_threshold=0.01
+        early_stopping_threshold=0
     )
 
 
@@ -258,31 +281,44 @@ def visualize_loss_curve(training_loss : XYData, val_loss : XYData):
     plt.legend()
     plt.show()
 
-if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        print("Usage: python train_cnn.py <n_samples> <output_file_path>")
-        sys.exit(1)
 
+def visualize_first_layer_weights(model : TrainingModel , img : torch.Tensor):
+    """
+    Visualize the first layer weights of the model.
+    Args:
+        model (TrainingModel): The model to visualize.
+        img (torch.Tensor): The image to visualize the weights on.
+    
+    """
+    # get module twice cause its a sequential nested in another sequential
+    filters = model.conv1.weight  # shape (num_filters, 3, 3, 3)
+    print("Filters shape: ", filters.shape)
+    print(filters.shape)
 
+    img = img.unsqueeze(0)        # (1, 3, 244, 244) - add batch dimension
+    
+    # show original image
+    plt.imshow(img.squeeze(0).permute(1, 2, 0).numpy())
+    plt.axis('off')
+    plt.title("Original Image")
+    plt.show()
 
-    n_samples = int(sys.argv[1])
-    output_file_path = sys.argv[2]
+    with torch.no_grad():
+        filtered_imgs = F.conv2d(img, filters, bias=None, stride=1, padding=1)  # (1, N, H, W)
+        filtered_imgs = filtered_imgs.squeeze(0)  # (N, H, W)
+        num_filters = filters.shape[0]
 
-    print(f"Using {n_samples} images for training and testing.")
+        # plot the filters and the filtered images
+        fig, axes = plt.subplots(int(num_filters/4) ,4, figsize=(8, 8))
+        for i in range(0,len(filters)):
+            row, col = divmod(i, 4)
 
-    model = init_torch_model()
-    training_params = init_training_params(model)
+            # make filtered images bigger
+            larger_img = cv2.resize(filtered_imgs[i].numpy(), (400, 400), interpolation=cv2.INTER_LINEAR)
+            axes[row, col].imshow(larger_img, cmap='gray')
+            axes[row, col].axis('off')
+        
+        plt.suptitle("Application of CNN Filters to Image", fontsize=16, fontweight="bold")
+        plt.show()    
 
-    # resize to 224x224 as preprocessing step
-    model_and_transform = ModelWithTransform(model, TRANSFORM)
-
-    train,val,test = get_image_data(n_samples)
-
-    train_loss, val_loss ,fire_detector = train_cnn(model_and_transform,training_params,train, val)
-
-    visualize_loss_curve(train_loss, val_loss)
-    # Save the trained model to a file
-    fire_detector.save_to_file(output_file_path)
-    print(f"Model saved to {output_file_path}")
-
-
+    
