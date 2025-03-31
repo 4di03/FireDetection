@@ -10,7 +10,7 @@ import random
 DFIRE_DATA_PATH = "D-Fire"
 PLACES_DATA_PATH = "data_256"
 FIRE_DATA_PATH = "fire_dataset"
-FIRE_VIDEOS_DATA_PATH = "fire_videos.1406"
+FIRE_VIDEOS_DATA_PATH = "fire_videos"
 FIRE_IMAGE_DATA_PATH = "Fire_Detection.v1.coco/train/"
 
 # image data which is an image tensor and a boolean (True if fire, False if no fire) for each image
@@ -97,6 +97,7 @@ def get_image_data(n_total_samples = 1000) -> Tuple[ImageData, ImageData, ImageD
         Each data set is a list of tuples, where each tuple contains an image tensor and a boolean (True if fire, False if no fire).
     """
 
+    
 
     # get complete dataset (random sample of n_total_samples images) such that 50% are fire and 50% are no fire
     num_fire_images = n_total_samples // 2

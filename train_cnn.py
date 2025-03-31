@@ -191,11 +191,11 @@ def train_cnn(model_and_transform :ModelWithTransform ,
             - model: The trained CNNFireDetector model.
     """
 
-
+    
     print("Begin training...")
     train_losses = []
     val_losses = []
-    model = model_and_transform.model
+    model = model_and_transform.model.to(training_parameters.device)
     transform = model_and_transform.transform
 
     # Create data loaders for training and validation data
@@ -309,12 +309,6 @@ def visualize_first_layer_weights(model : TrainingModel , img : torch.Tensor):
 
     img = img.unsqueeze(0)        # (1, 3, 244, 244) - add batch dimension
     
-    # show original image
-    plt.imshow(img.squeeze(0).permute(1, 2, 0).numpy())
-    plt.axis('off')
-    plt.title("Original Image")
-    plt.show()
-
     with torch.no_grad():
         filtered_imgs = F.conv2d(img, filters, bias=None, stride=1, padding=1)  # (1, N, H, W)
         filtered_imgs = filtered_imgs.squeeze(0)  # (N, H, W)

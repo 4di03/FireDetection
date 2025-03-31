@@ -13,3 +13,5 @@ __pycache__/
 data/*
 *.ipynb_checkpoint*
 places_365/*
+fire_dataset/*
+*.pth
