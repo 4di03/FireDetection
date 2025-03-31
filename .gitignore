@@ -7,7 +7,9 @@ train_256*
 FIRE_*
 data_256/*
 *.zip
-Fire_Detection.v1i.coco/
+Fire_Detection.vl1.coco/
 .DS_Store
 __pycache__/
 data/*
+*.ipynb_checkpoint*
+places_365/*
