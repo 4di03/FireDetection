@@ -15,3 +15,4 @@ data/*
 places_365/*
 fire_dataset/*
 *.pth
+*.pt

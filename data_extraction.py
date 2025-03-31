@@ -66,7 +66,7 @@ def display_video(video_tensor: torch.Tensor, num_frames: int = 5):
     plt.show()
 
 
-def get_random_jpg_file_data(directory, n) -> List[torch.Tensor]:
+def get_random_img_file_data(directory, n) -> List[torch.Tensor]:
     """
     Get n random jpg files from a directory and its subdirectories.
     Args:
@@ -76,10 +76,12 @@ def get_random_jpg_file_data(directory, n) -> List[torch.Tensor]:
         List[torch.Tensor]: A list of n random jpg images converted to tensors.
     """
     jpg_files = []
+    print("Searching for jpg files in directory:", directory)
     for root, _, files in os.walk(directory):
         for file in files:
-            if file.lower().endswith('.jpg'):
+            if file.lower().split(".")[-1] in ["jpg", "jpeg", "png"]:
                 jpg_files.append(os.path.join(root, file))
+    print(f"Found {len(jpg_files)} jpg files in directory: {directory}")
     
     # randomly sample n jpg file paths and then read the file as tensor
     image_tensors = list(map(lambda img_path : torchvision.io.read_image(img_path), 
@@ -101,9 +103,17 @@ def get_image_data(n_total_samples = 1000) -> Tuple[ImageData, ImageData, ImageD
 
     # get complete dataset (random sample of n_total_samples images) such that 50% are fire and 50% are no fire
     num_fire_images = n_total_samples // 2
+
+    fire_jpg_files = get_random_img_file_data(FIRE_DATA_PATH, num_fire_images)
+    num_fire_images = len(fire_jpg_files)
+
+    fire_images =  list(zip(fire_jpg_files, [True] * num_fire_images))
     num_nofire_images = num_fire_images
-    fire_images =  list(zip(get_random_jpg_file_data(FIRE_IMAGE_DATA_PATH, num_fire_images), [True] * (num_fire_images)))
-    nofire_images = list(zip(get_random_jpg_file_data(PLACES_DATA_PATH, num_nofire_images), [False] * (num_nofire_images)))
+
+    print(f"Number of fire images: {num_fire_images}")
+    print(f"Number of no fire images: {num_nofire_images}")
+
+    nofire_images = list(zip(get_random_img_file_data(PLACES_DATA_PATH, num_nofire_images), [False] * (num_nofire_images)))
 
     # combine the lists and shuffle them
     all_images = fire_images + nofire_images
