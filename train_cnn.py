@@ -89,7 +89,7 @@ class TrainingParameters:
     batch_size : int
     n_epochs : int
     early_stopping_threshold : float = 1e-3 # threshold for which we stop trianing if loss is less change is less than this for consecutive epochs where loss is decreasing, set to 0 to disable
-
+    device : torch.device = torch.device("cpu") # device to use for training, default is cpu
 
 @dataclasses.dataclass
 class ModelWithTransform:
@@ -119,9 +119,15 @@ def get_total_avg_loss(network : torch.nn.Module,
         raise ValueError("Dataloader is empty")
     total_loss = 0
     network.eval()  # set network to evaluation mode
-
+    device = next(network.parameters()).device
     with torch.no_grad():
         for test_images, test_labels in dataloader:
+
+            # move data to device
+            test_images = test_images.to(device)
+            test_labels = test_labels.to(device)
+
+
             test_output = network(test_images)
             total_loss += loss_function(test_output.squeeze(1), test_labels).item()
 
@@ -204,6 +210,11 @@ def train_cnn(model_and_transform :ModelWithTransform ,
 
         cur_epoch_train_loss = 0
         for batch_index, (train_images, train_labels) in enumerate(train_dataloader):
+
+            # move data to device
+            train_images = train_images.to(training_parameters.device)
+            train_labels = train_labels.to(training_parameters.device)
+
             training_parameters.optimizer.zero_grad()  # zero the gradients for safety
 
 

@@ -14,16 +14,16 @@ class CNNFireDetector(ImageModel):
     custom CNN image model based on pytorch nn.Module
     """
 
-    def __init__(self, model : torch.nn.Module):
+    def __init__(self, model : torch.nn.Module, device : torch.device = torch.device("cpu")):
         """
         Initialize the CNNFireDetector with a pre-trained model.
         
         Args:
             model: A pre-trained CNN model for fire detection.
         """
+        self.model = model.to(device)  # Move the model to the specified device
         model.eval()  # Set the model to evaluation mode
-        self.model = model
-    
+
 
     def predict(self, image : torch.tensor) -> float:
         """
@@ -32,7 +32,7 @@ class CNNFireDetector(ImageModel):
             image: The input image to be processed.
         Returns:
             A float representing the fire probability for the entire image.
-        """
+        """        
         return self.model(image).item()
     
 
