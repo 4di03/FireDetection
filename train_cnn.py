@@ -34,6 +34,34 @@ TRANSFORM = transforms.Compose([
 
 # TODO: consider recalcualating mean and std for the dataset if these do not work well
 
+
+def calculate_conv_output_size(model : torch.nn.Module , input_size : Tuple[int, int, int]) -> int:
+    """
+    Calculate the output size of the convolutional layers given an input size.
+    Args:
+        model: The model containing the convolutional layers.
+        input_size: The size of the input tensor.
+    Returns:
+        int: The output size (number of values) after passing through the convolutional layers and flattening.
+    """
+
+    # make sure last layer is flatten
+    if not isinstance(model[-1], torch.nn.Flatten):
+        raise ValueError("Last layer of model must be a Flatten layer")
+    
+
+    # Create a dummy input tensor with the given size
+    dummy_input = torch.randn(1, *input_size)  # (batch_size, channels, height, width)
+    with torch.no_grad():
+        # Pass the dummy input through the model
+        output = model(dummy_input)
+        
+        # Get the size of the output after flattening
+        output_size = output.numel()
+        
+    return output_size
+
+
 class TrainingModel(torch.nn.Module):
 
     def __init__(self):
@@ -45,36 +73,38 @@ class TrainingModel(torch.nn.Module):
         """
         super(TrainingModel, self).__init__()
 
-        conv1_kernel_size = 3
-        conv2_kernel_size = 3
-        pool1_kernel_size =2
-        pool2_kernel_size = 2
-        conv1_channels = 16
-        conv2_channels = 32
-        fc1_nodes = 128
-        fc2_nodes = 128
+        # use leakyRelu to avoid dead neurons from negative inputs after normalization of the images
+
+        self.convolutional_layers = torch.nn.Sequential(
+            torch.nn.Conv2d(3, 16, kernel_size=3, stride=1),
+            torch.nn.LeakyReLU(),
+            torch.nn.Conv2d(16, 16, kernel_size=3, stride=1),
+            torch.nn.MaxPool2d(kernel_size=3, stride=2),
+            torch.nn.LeakyReLU(),
+            torch.nn.Conv2d(16, 16, kernel_size=3, stride=1),
+            torch.nn.LeakyReLU(),
+            torch.nn.Conv2d(16, 1, kernel_size=3, stride=1),
+            torch.nn.MaxPool2d(kernel_size=3, stride=2),
+            torch.nn.LeakyReLU(),
+            torch.nn.Flatten()
+        )
+
+        # calculate number of values in the flattened output of the convolutional layers
+        conv_layers_output_size = calculate_conv_output_size(self.convolutional_layers, (3, TARGET_IMAGE_SIZE, TARGET_IMAGE_SIZE))
+
+        self.sequential_layers = torch.nn.Sequential(
+            torch.nn.Linear(conv_layers_output_size, 100),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(100, 100),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(100, 1)
+            # don't apply sigmoid here, we will do it in InferenceModel and instead we use BCEWithLogitsLoss for training
+        )
 
 
-        image_size_after_convs = ((TARGET_IMAGE_SIZE - conv1_kernel_size + 1) - conv2_kernel_size + 1) // 2
-        
-        self.conv1 = torch.nn.Conv2d(3, conv1_channels, kernel_size=conv1_kernel_size, stride=1)
-        self.conv2 = torch.nn.Conv2d(conv1_channels, conv2_channels, kernel_size=conv2_kernel_size, stride=1)
-        self.fc1 = torch.nn.Linear(conv2_channels * image_size_after_convs * image_size_after_convs, fc1_nodes)  # Adjusted input size
-        self.fc2 = torch.nn.Linear(fc1_nodes, fc2_nodes)  # Output size for binary classification
-        self.out = torch.nn.Linear(fc2_nodes,1)
         self.net = torch.nn.Sequential(
-            self.conv1,
-            torch.nn.ReLU(),
-            self.conv2,
-            torch.nn.ReLU(),
-            torch.nn.MaxPool2d(kernel_size=pool2_kernel_size, stride = 2),
-            torch.nn.ReLU(),
-            torch.nn.Flatten(),
-            self.fc1,
-            torch.nn.ReLU(),
-            self.fc2,
-            torch.nn.ReLU(),
-            self.out
+            self.convolutional_layers,
+            self.sequential_layers
         )
 
     def forward(self, x):
@@ -332,7 +362,7 @@ def visualize_loss_curve(training_loss : XYData, val_loss : XYData):
     plt.show()
 
 
-def visualize_first_layer_weights(model : TrainingModel , img : torch.Tensor):
+def visualize_layer_weights(layer : torch.nn.Module , img : torch.Tensor):
     """
     Visualize the first layer weights of the model.
     Args:
@@ -341,7 +371,7 @@ def visualize_first_layer_weights(model : TrainingModel , img : torch.Tensor):
     
     """
     # get module twice cause its a sequential nested in another sequential
-    filters = model.conv1.weight  # shape (num_filters, 3, 3, 3)
+    filters = layer.weight  # shape (num_filters, 3, 3, 3)
     print("Filters shape: ", filters.shape)
     print(filters.shape)
 
