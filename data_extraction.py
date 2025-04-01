@@ -12,6 +12,7 @@ PLACES_DATA_PATH = "data/data_256"
 #FIRE_DATA_PATH = "data/fire_dataset"
 FIRE_VIDEOS_DATA_PATH = "data/fire_videos"
 FIRE_IMAGE_DATA_PATH = "data/Fire_Detection.v1.coco/train/"
+TENSOR_CACHE_PATH = "data/tensor_cache"
 
 # image data which is an image tensor and a boolean (True if fire, False if no fire) for each image
 ImageData = List[Tuple[torch.Tensor, bool]]
@@ -23,7 +24,7 @@ VideoData = List[torch.Tensor]
 
 def get_video_data(videos_path : str =FIRE_VIDEOS_DATA_PATH + "/validation" ) -> Tuple[torch.Tensor, torch.Tensor]:
     """
-    reads videos from directory and returns a tuple of tensors containing image data.
+    Reads videos from directory and returns a tuple of tensors containing image data.
     Args:
         videos_path (str): The path to the directory containing the videos.
         The directory should contain two subdirectories: "pos" and "neg" in which pos contains videos with fire and neg contains videos without fire.
@@ -32,24 +33,37 @@ def get_video_data(videos_path : str =FIRE_VIDEOS_DATA_PATH + "/validation" ) ->
             - The first list contains tensors representing videos with fire.
             - The second list contains tensors representing videos without fire.
     """
-    pos_videos = []
 
-    for pos_video in os.listdir(os.path.join(videos_path, "pos")):
-        pos_video_path = os.path.join(videos_path, "pos", pos_video)
-        frames, _, _ = torchvision.io.read_video(pos_video_path)  # frames: [T, H, W, C]
-        # resize image to [T, C, H , W]
-        frames = frames.permute([0,3,1,2])
-
-        pos_videos.append(frames)  # Append the frames tensor to the list
-
-    neg_videos = []
-    for neg_video in os.listdir(os.path.join(videos_path, "neg")):
-        neg_video_path = os.path.join(videos_path, "neg", neg_video)
-        frames, _, _ = torchvision.io.read_video(neg_video_path)  # frames: [T, H, W, C]
-        # resize image to [T, C, H , W]
-        frames = frames.permute([0,3,1,2])
-        
-        neg_videos.append(frames)  # Append the frames tensor to the list
+    pos_videos_path = os.path.join(TENSOR_CACHE_PATH, "pos_videos.pt")
+    neg_videos_path = os.path.join(TENSOR_CACHE_PATH, "neg_videos.pt")
+    # check tensor cache for cached tensors
+    if  os.path.isfile(pos_videos_path) and os.path.isfile(neg_videos_path):
+        pos_videos = torch.load(pos_videos_path)
+        neg_videos = torch.load(neg_videos_path)
+    else:
+        pos_videos = []
+    
+        for pos_video in os.listdir(os.path.join(videos_path, "pos")):
+            pos_video_path = os.path.join(videos_path, "pos", pos_video)
+            frames, _, _ = torchvision.io.read_video(pos_video_path)  # frames: [T, H, W, C]
+            # resize image to [T, C, H , W]
+            frames = frames.permute([0,3,1,2])
+    
+            pos_videos.append(frames)  # Append the frames tensor to the list
+    
+        neg_videos = []
+        for neg_video in os.listdir(os.path.join(videos_path, "neg")):
+            neg_video_path = os.path.join(videos_path, "neg", neg_video)
+            frames, _, _ = torchvision.io.read_video(neg_video_path)  # frames: [T, H, W, C]
+            # resize image to [T, C, H , W]
+            frames = frames.permute([0,3,1,2])
+            
+            neg_videos.append(frames)  # Append the frames tensor to the list
+            
+        # save to tensor cache
+        torch.save(pos_videos, pos_videos_path)
+        torch.save(neg_videos, neg_videos_path)
+    
 
     return pos_videos, neg_videos
 
@@ -61,7 +75,6 @@ def display_video(video_tensor: torch.Tensor, num_frames: int = 5):
         video_tensor (torch.Tensor): The video tensor to display.
         num_frames (int): The number of frames to display.
     
-
     """
     num_frames = min(num_frames, video_tensor.shape[0])
     fig, axes = plt.subplots(1, num_frames, figsize=(15, 5))

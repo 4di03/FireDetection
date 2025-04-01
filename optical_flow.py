@@ -20,5 +20,6 @@ class FarnebackOpticalFlowModel(VideoModel):
             A float representing the fire probability for the last frame in the video stream.
         
         """
+        pass
 
 

@@ -18,7 +18,7 @@ from torch.utils.data import Dataset
 import torch.nn.functional as F
 import cv2
 # preprocessing step for images
-TARGET_IMAGE_SIZE = 224
+TARGET_IMAGE_SIZE = 64
 TRANSFORM = transforms.Compose([ 
                                 # conver to float tensor in range [0,1]
                                 transforms.Lambda(lambda x: x.float()/255.0),
@@ -44,21 +44,37 @@ class TrainingModel(torch.nn.Module):
             model: A pre-trained CNN model for fire detection.
         """
         super(TrainingModel, self).__init__()
-        self.conv1 = torch.nn.Conv2d(3, 16, kernel_size=3, stride=1)
-        self.conv2 = torch.nn.Conv2d(16, 32, kernel_size=3, stride=1)
-        self.fc1 = torch.nn.Linear(32 * 54 * 54, 128)  # Adjusted input size
-        self.fc2 = torch.nn.Linear(128, 1)  # Output size for binary classification
+
+        conv1_kernel_size = 3
+        conv2_kernel_size = 3
+        pool1_kernel_size =2
+        pool2_kernel_size = 2
+        conv1_channels = 16
+        conv2_channels = 32
+        fc1_nodes = 128
+        fc2_nodes = 128
+
+
+        image_size_after_convs = ((TARGET_IMAGE_SIZE - conv1_kernel_size + 1) - conv2_kernel_size + 1) // 2
+        
+        self.conv1 = torch.nn.Conv2d(3, conv1_channels, kernel_size=conv1_kernel_size, stride=1)
+        self.conv2 = torch.nn.Conv2d(conv1_channels, conv2_channels, kernel_size=conv2_kernel_size, stride=1)
+        self.fc1 = torch.nn.Linear(conv2_channels * image_size_after_convs * image_size_after_convs, fc1_nodes)  # Adjusted input size
+        self.fc2 = torch.nn.Linear(fc1_nodes, fc2_nodes)  # Output size for binary classification
+        self.out = torch.nn.Linear(fc2_nodes,1)
         self.net = torch.nn.Sequential(
             self.conv1,
-            torch.nn.MaxPool2d(kernel_size=2, stride = 2),
             torch.nn.ReLU(),
             self.conv2,
-            torch.nn.MaxPool2d(kernel_size=2, stride = 2),
+            torch.nn.ReLU(),
+            torch.nn.MaxPool2d(kernel_size=pool2_kernel_size, stride = 2),
             torch.nn.ReLU(),
             torch.nn.Flatten(),
             self.fc1,
             torch.nn.ReLU(),
             self.fc2,
+            torch.nn.ReLU(),
+            self.out
         )
 
     def forward(self, x):
@@ -79,11 +95,26 @@ class InferenceModel(torch.nn.Module):
         self.trained_model = trained_model
         self.transform = transform
     def forward(self, x):
+        """
+        Predicts the fire probabilty for each image in x.
+        We apply the approporiate preprocessing transform to x or the batch of images in x and then 
+        pass it to the trained_model.
 
-        print(f"X shape pre-transform : {x.shape}")
-        x = self.transform(x)
-        print(f"X shape post-transform : {x.shape}")
-
+        TODO: consider batch preprpeocessing if this is too slow.
+        Args:
+            x : image tensor or batch of image tensors
+        Returns:
+            float for fire probability between 0 and 1
+        """
+        if len(x.shape) == 3:
+            # Single image: (3, H, W)
+            x = self.transform(x).unsqueeze(0)  # Make it (1, 3, H, W)
+        elif len(x.shape) == 4:
+            # Batch of images: (B, 3, H, W)
+            x = torch.stack([self.transform(img) for img in x])
+        else:
+            raise ValueError("Expected input of shape (3, H, W) or (B, 3, H, W)")
+    
         return torch.sigmoid(self.trained_model(x))
 
 
