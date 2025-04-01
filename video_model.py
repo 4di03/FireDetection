@@ -56,4 +56,5 @@ class VideoModelFromImageModel(VideoModel):
         self.image_model = image_model
 
     def predict_on_last_frame(self, frames : List[torch.tensor]) -> float:
-        return self.image_model.predict(frames[-1])
+        print("L59", frames[-1].shape)
+        return self.image_model.predict(frames[-1]) # add batch dimension

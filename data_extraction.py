@@ -7,11 +7,11 @@ import torchvision.transforms.functional as F
 import random
 
 
-#DFIRE_DATA_PATH = "D-Fire"
-PLACES_DATA_PATH = "data_256"
-#FIRE_DATA_PATH = "fire_dataset"
-FIRE_VIDEOS_DATA_PATH = "fire_videos"
-FIRE_IMAGE_DATA_PATH = "Fire_Detection.v1.coco/train/"
+#DFIRE_DATA_PATH = "data/D-Fire"
+PLACES_DATA_PATH = "data/data_256"
+#FIRE_DATA_PATH = "data/fire_dataset"
+FIRE_VIDEOS_DATA_PATH = "data/fire_videos"
+FIRE_IMAGE_DATA_PATH = "data/Fire_Detection.v1.coco/train/"
 
 # image data which is an image tensor and a boolean (True if fire, False if no fire) for each image
 ImageData = List[Tuple[torch.Tensor, bool]]
