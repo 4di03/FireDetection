@@ -9,7 +9,6 @@ Contains functionality for training CNN models for fire detection from images.
 from cnn import CNNFireDetector
 import torch
 from data_extraction import ImageData, get_image_data
-import sys
 import dataclasses
 from typing import List, Tuple
 import matplotlib.pyplot as plt
@@ -17,8 +16,10 @@ from torchvision import transforms
 from torch.utils.data import Dataset
 import torch.nn.functional as F
 import cv2
-# preprocessing step for images
-TARGET_IMAGE_SIZE = 64
+# size that we resize the images (square) to before passing to the model
+TARGET_IMAGE_SIZE = 128
+
+
 TRANSFORM = transforms.Compose([ 
                                 # conver to float tensor in range [0,1]
                                 transforms.Lambda(lambda x: x.float()/255.0),
@@ -55,9 +56,9 @@ def calculate_conv_output_size(model : torch.nn.Module , input_size : Tuple[int,
     with torch.no_grad():
         # Pass the dummy input through the model
         output = model(dummy_input)
-        
-        # Get the size of the output after flattening
-        output_size = output.numel()
+    
+    # Get the size of the output after flattening
+    output_size = output.numel()
         
     return output_size
 
@@ -75,16 +76,25 @@ class TrainingModel(torch.nn.Module):
 
         # use leakyRelu to avoid dead neurons from negative inputs after normalization of the images
 
+        conv_channels = 32
+        conv_kernel_size = 5
+        conv_padding = 0
+        conv_stride = 1
+        pooling_kernel_size = 3
+        pooling_stride = 2
+        fc_nodes = 128
+
         self.convolutional_layers = torch.nn.Sequential(
-            torch.nn.Conv2d(3, 16, kernel_size=3, stride=1),
+            torch.nn.Conv2d(3, conv_channels, kernel_size=conv_kernel_size, stride=conv_stride, padding = conv_padding),
             torch.nn.LeakyReLU(),
-            torch.nn.Conv2d(16, 16, kernel_size=3, stride=1),
-            torch.nn.MaxPool2d(kernel_size=3, stride=2),
+            torch.nn.Conv2d(conv_channels, conv_channels, kernel_size=conv_kernel_size, stride=conv_stride, padding = conv_padding),
+            torch.nn.MaxPool2d(kernel_size=pooling_kernel_size, stride=pooling_stride),
             torch.nn.LeakyReLU(),
-            torch.nn.Conv2d(16, 16, kernel_size=3, stride=1),
+            torch.nn.Conv2d(conv_channels, conv_channels, kernel_size=conv_kernel_size, stride=conv_stride, padding = conv_padding),
             torch.nn.LeakyReLU(),
-            torch.nn.Conv2d(16, 1, kernel_size=3, stride=1),
-            torch.nn.MaxPool2d(kernel_size=3, stride=2),
+            # reduce to 1 feature map to extract most important features
+            torch.nn.Conv2d(conv_channels, 1, kernel_size=conv_kernel_size, stride=conv_stride, padding = conv_padding),
+            torch.nn.MaxPool2d(kernel_size=pooling_kernel_size, stride=pooling_stride),
             torch.nn.LeakyReLU(),
             torch.nn.Flatten()
         )
@@ -93,19 +103,25 @@ class TrainingModel(torch.nn.Module):
         conv_layers_output_size = calculate_conv_output_size(self.convolutional_layers, (3, TARGET_IMAGE_SIZE, TARGET_IMAGE_SIZE))
 
         self.sequential_layers = torch.nn.Sequential(
-            torch.nn.Linear(conv_layers_output_size, 100),
+            torch.nn.Linear(conv_layers_output_size, fc_nodes),
             torch.nn.LeakyReLU(),
-            torch.nn.Linear(100, 100),
+            torch.nn.Linear(fc_nodes, fc_nodes),
             torch.nn.LeakyReLU(),
-            torch.nn.Linear(100, 1)
+            torch.nn.Linear(fc_nodes, 1)
             # don't apply sigmoid here, we will do it in InferenceModel and instead we use BCEWithLogitsLoss for training
         )
+
+    
 
 
         self.net = torch.nn.Sequential(
             self.convolutional_layers,
             self.sequential_layers
         )
+
+        # print number of parameters in the model
+        num_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
+        print(f"Number of parameters in the model: {num_params}")
 
     def forward(self, x):
         return self.net(x)
@@ -156,6 +172,7 @@ class TrainingParameters:
     loss_function : torch.nn.Module
     batch_size : int
     n_epochs : int
+    scheduler : torch.optim.lr_scheduler = None # learning rate scheduler, default is None
     early_stopping_threshold : float = 1e-3 # threshold for which we stop trianing if loss is less change is less than this for consecutive epochs where loss is decreasing, set to 0 to disable
     device : torch.device = torch.device("cpu") # device to use for training, default is cpu
 
@@ -303,7 +320,15 @@ def train_cnn(model_and_transform :ModelWithTransform ,
 
 
         # predict on validation data after each epoch
-        val_losses.append(get_total_avg_loss(model, val_dataloader, training_parameters.loss_function))
+        val_loss = get_total_avg_loss(model, val_dataloader, training_parameters.loss_function)
+        val_losses.append(val_loss)
+        if training_parameters.scheduler is not None:
+            # update the learning rate if using a scheduler
+            training_parameters.scheduler.step(val_loss)  # step the scheduler if using one
+
+            
+
+
 
         print(f"Epoch {epoch_index + 1} completed. Train loss: {cur_epoch_train_loss:.4f}, Validation loss: {val_losses[-1]:.4f}")
 
