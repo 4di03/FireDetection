@@ -19,7 +19,7 @@ class CNNFireDetector(ImageModel):
         Initialize the CNNFireDetector with a pre-trained model.
         
         Args:
-            model: A pre-trained CNN model for fire detection.
+            model: A pre-trained CNN model for fire detection. It must be responsible for its own image preprocessing in it's forward pass.
         """
         self.model = model.to(device)  # Move the model to the specified device
         model.eval()  # Set the model to evaluation mode
@@ -28,6 +28,7 @@ class CNNFireDetector(ImageModel):
     def predict(self, image : torch.tensor) -> float:
         """
         Predict the fire probability for the given image.
+
         Args:
             image: The input image to be processed.
         Returns:

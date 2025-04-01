@@ -37,12 +37,18 @@ def get_video_data(videos_path : str =FIRE_VIDEOS_DATA_PATH + "/validation" ) ->
     for pos_video in os.listdir(os.path.join(videos_path, "pos")):
         pos_video_path = os.path.join(videos_path, "pos", pos_video)
         frames, _, _ = torchvision.io.read_video(pos_video_path)  # frames: [T, H, W, C]
+        # resize image to [T, C, H , W]
+        frames = frames.permute([0,3,1,2])
+
         pos_videos.append(frames)  # Append the frames tensor to the list
 
     neg_videos = []
     for neg_video in os.listdir(os.path.join(videos_path, "neg")):
         neg_video_path = os.path.join(videos_path, "neg", neg_video)
         frames, _, _ = torchvision.io.read_video(neg_video_path)  # frames: [T, H, W, C]
+        # resize image to [T, C, H , W]
+        frames = frames.permute([0,3,1,2])
+        
         neg_videos.append(frames)  # Append the frames tensor to the list
 
     return pos_videos, neg_videos

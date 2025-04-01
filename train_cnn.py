@@ -67,17 +67,24 @@ class TrainingModel(torch.nn.Module):
 
 class InferenceModel(torch.nn.Module):
 
-    def __init__(self, trained_model : TrainingModel):
+    def __init__(self, trained_model : TrainingModel, transform : torch.nn.Module = TRANSFORM):
         """
         Initialize the InferenceModel with a pre-trained model.
         
         Args:
             model: A pre-trained CNN model for fire detection.
+            transform : preprocessing transform to apply before predicting on images. Should be the same as the one used in training.
         """
         super(InferenceModel, self).__init__()
         self.trained_model = trained_model
+        self.transform = transform
     def forward(self, x):
-        return torch.sigmoid(self.model(x))
+
+        print(f"X shape pre-transform : {x.shape}")
+        x = self.transform(x)
+        print(f"X shape post-transform : {x.shape}")
+
+        return torch.sigmoid(self.trained_model(x))
 
 
 
@@ -249,7 +256,7 @@ def train_cnn(model_and_transform :ModelWithTransform ,
     train_loss_plot = XYData(x=range(len(train_losses)), y=train_losses)
     val_loss_plot = XYData(x=range(len(val_losses)), y=val_losses)
 
-    inference_model = InferenceModel(model)
+    inference_model = InferenceModel(model, transform)
 
     model = CNNFireDetector(inference_model)
 
