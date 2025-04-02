@@ -46,6 +46,30 @@ def get_recall(predictions_on_fire_video : List[List[float]], threshold : float)
     return tp / (tp + fn)
 
 
+def get_accuracy(predictions_on_fire_video : List[List[float]],predictions_on_nofire_video : List[List[float]], threshold : float) -> float:
+    """
+    Get accuracy for the model predictions using the given threshold.
+    Args:
+        predictions_on_fire_video (List[List[float]]): List of predictions for each frame in a video where all frames are positives.
+        predictions_on_nofire_video (List[List[float]]): List of predictions for each frame in a video where all frames are negatives
+        threshold (float): The threshold to use for determining fire.
+    Returns:
+        float: The accuracy for the model predictions. (True Positives + True Negatives) / (all predictions)
+    """
+
+    total = len(predictions_on_fire_video) + len(predictions_on_nofire_video)
+    tp = 0
+    tn = 0
+    for pred in predictions_on_fire_video:
+        for p in pred:
+            if p >= threshold:
+                tp += 1 # correct if the prediction is fire
+    for pred in predictions_on_nofire_video:
+        for p in pred:
+            if p < threshold:
+                tn += 1 # correct if the prediction is no fire
+
+    return (tp + tn) / total
 def get_false_positive_rate(predictions_on_nofire_video : List[List[float]], threshold : float) -> float:
     """
     Get false positive rate for the model predictions using the given threshold.
