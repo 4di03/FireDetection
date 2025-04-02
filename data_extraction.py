@@ -139,11 +139,11 @@ def get_image_data(n_total_samples = 1000) -> Tuple[ImageData, ImageData, ImageD
     random.shuffle(all_images)
 
     # split into train, val, test
-    n_train_samples = int(n_total_samples * 0.6)
-    n_val_samples = int(n_total_samples * 0.2)
+    n_train_samples = int(n_total_samples * 0.8)
+    n_val_samples = int(n_total_samples * 0.1)
     train_images = all_images[:n_train_samples]
     val_images = all_images[n_train_samples:n_train_samples + n_val_samples]
-    test_images = all_images[n_train_samples + n_val_samples:] # will have remaining 20% of data since we are using 80% for train and val
+    test_images = all_images[n_train_samples + n_val_samples:] # will have remaining 10% of data since we are using 90% for train and val
 
     return train_images, val_images, test_images
 

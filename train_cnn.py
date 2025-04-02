@@ -82,7 +82,11 @@ class TrainingModel(torch.nn.Module):
         conv_stride = 1
         pooling_kernel_size = 3
         pooling_stride = 2
-        fc_nodes = 128
+
+        final_conv_feature_maps = 8
+        dropout_prob = 0.5
+
+        fc_nodes = 64
         # TODO: rearchitectu model to use dropout, and not be a copy of source 150 
         # things to try: - skip connections, residual connections, batch normalization, dropout
         # change train /test/val to 80/10/10
@@ -92,15 +96,18 @@ class TrainingModel(torch.nn.Module):
         self.convolutional_layers = torch.nn.Sequential(
             torch.nn.Conv2d(3, conv_channels, kernel_size=conv_kernel_size, stride=conv_stride, padding = conv_padding),
             torch.nn.LeakyReLU(),
+            torch.nn.Dropout(p=dropout_prob),
             torch.nn.Conv2d(conv_channels, conv_channels, kernel_size=conv_kernel_size, stride=conv_stride, padding = conv_padding),
             torch.nn.MaxPool2d(kernel_size=pooling_kernel_size, stride=pooling_stride),
             torch.nn.LeakyReLU(),
-            torch.nn.Conv2d(conv_channels, conv_channels, kernel_size=conv_kernel_size, stride=conv_stride, padding = conv_padding),
-            torch.nn.LeakyReLU(),
+            torch.nn.Dropout(p=dropout_prob),
+            # torch.nn.Conv2d(conv_channels, conv_channels, kernel_size=conv_kernel_size, stride=conv_stride, padding = conv_padding),
+            # torch.nn.LeakyReLU(),
+            # torch.nn.Dropout(p=dropout_prob),
             # reduce to 1 feature map to extract most important features
-            torch.nn.Conv2d(conv_channels, 1, kernel_size=conv_kernel_size, stride=conv_stride, padding = conv_padding),
-            torch.nn.MaxPool2d(kernel_size=pooling_kernel_size, stride=pooling_stride),
+            torch.nn.Conv2d(conv_channels, final_conv_feature_maps, kernel_size=conv_kernel_size, stride=conv_stride, padding = conv_padding),
             torch.nn.LeakyReLU(),
+            torch.nn.Dropout(p=dropout_prob),
             torch.nn.Flatten()
         )
 
@@ -110,8 +117,10 @@ class TrainingModel(torch.nn.Module):
         self.sequential_layers = torch.nn.Sequential(
             torch.nn.Linear(conv_layers_output_size, fc_nodes),
             torch.nn.LeakyReLU(),
+            torch.nn.Dropout(p=dropout_prob),
             torch.nn.Linear(fc_nodes, fc_nodes),
             torch.nn.LeakyReLU(),
+            torch.nn.Dropout(p=dropout_prob),
             torch.nn.Linear(fc_nodes, 1)
             # don't apply sigmoid here, we will do it in InferenceModel and instead we use BCEWithLogitsLoss for training
         )
