@@ -76,7 +76,7 @@ class TrainingModel(torch.nn.Module):
 
         # use leakyRelu to avoid dead neurons from negative inputs after normalization of the images
 
-        conv_channels = 32
+        conv_channels = 16
         conv_kernel_size = 5
         conv_padding = 0
         conv_stride = 1
