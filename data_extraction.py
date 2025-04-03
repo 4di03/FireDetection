@@ -138,6 +138,7 @@ def get_image_data(n_total_samples = 1000) -> Tuple[ImageData, ImageData, ImageD
     all_images = fire_images + nofire_images
     random.shuffle(all_images)
 
+    n_total_samples = len(all_images)
     # split into train, val, test
     n_train_samples = int(n_total_samples * 0.8)
     n_val_samples = int(n_total_samples * 0.1)
