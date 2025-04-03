@@ -18,6 +18,7 @@ def get_metrics(predictions : List[float], labels : List[float], threshold : flo
         predictions (List[float]): List of predictions for each image
         labels (List[float]): List of labels for each image (1 for fire, 0 for no fire)
         threshold (float): The threshold to use for determining fire.
+        
     Returns:
         float: The recall for the model predictions.
         float: The false positive rate for the model predictions.
@@ -47,7 +48,7 @@ def get_metrics(predictions : List[float], labels : List[float], threshold : flo
 
 
 
-def get_predictions_on_videos(model : VideoModel, videos : List[torch.Tensor]) -> List[List[float]]:
+def get_predictions_on_videos(model : VideoModel, videos : List[torch.Tensor]) -> List[List[float], float, int]:
     """
     Get fire probility predictions for each frame in the video.
     Args:
@@ -55,12 +56,21 @@ def get_predictions_on_videos(model : VideoModel, videos : List[torch.Tensor]) -
         videos (List[torch.Tensor]): List of videos to predict on.
     Returns:
         List[List[float]]: List of predictions for each frame in the video.
+        float : the total time to predict on all videos (ms)
+        int : the total number of frames in all videos
     """
     predictions = []
+    total_time_ms = 0
+    total_frames = 0
     for video in videos:
-        predictions.append(model.predict_on_full_video(video))
+        start = time.perf_counter()
+        pred = model.predict_on_full_video(video)
+        time_taken = (time.perf_counter() - start) * 1000  # convert to ms
+        total_time_ms += time_taken
+        total_frames += len(video)
+        predictions.append(pred)
 
-    return predictions
+    return predictions, total_time_ms, total_frames
 
 
 def get_recall(predictions_on_fire_video : List[List[float]], threshold : float) -> float:
