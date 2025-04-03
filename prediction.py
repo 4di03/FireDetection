@@ -57,18 +57,19 @@ def get_accuracy(predictions_on_fire_video : List[List[float]],predictions_on_no
         float: The accuracy for the model predictions. (True Positives + True Negatives) / (all predictions)
     """
 
-    total = len(predictions_on_fire_video) + len(predictions_on_nofire_video)
+    total = 0
     tp = 0
     tn = 0
     for pred in predictions_on_fire_video:
         for p in pred:
             if p >= threshold:
                 tp += 1 # correct if the prediction is fire
+        total += len(pred)
     for pred in predictions_on_nofire_video:
         for p in pred:
             if p < threshold:
                 tn += 1 # correct if the prediction is no fire
-
+        total+= len(pred)
     return (tp + tn) / total
 def get_false_positive_rate(predictions_on_nofire_video : List[List[float]], threshold : float) -> float:
     """
