@@ -57,16 +57,18 @@ class FireDataset(Dataset):
         if self.images.shape[0] != self.labels.shape[0]:
             raise ValueError("The number of images and labels must be the same.")
 
-    def __init__(self, data_name:str):
+    @staticmethod
+    def init_from_data_name(data_name : str) -> "FireDataset":
         """
+        Initalize a datset given the name of the tensors for images and labels.
         Args:
             data_name (str): The name of the dataset to load.
+        Returns:
+            FireDataset
         """
-        self.data_name = data_name
-        self.images = torch.load(os.path.join(TENSOR_CACHE_PATH, f"{data_name}_images.pt"))
-        self.labels = torch.load(os.path.join(TENSOR_CACHE_PATH, f"{data_name}_labels.pt"))
-        if self.images.shape[0] != self.labels.shape[0]:
-            raise ValueError("The number of images and labels must be the same.")
+        images = torch.load(os.path.join(TENSOR_CACHE_PATH, f"{data_name}_images.pt"))
+        labels = torch.load(os.path.join(TENSOR_CACHE_PATH, f"{data_name}_labels.pt"))
+        return FireDataset(images, labels)
 
 
     def __len__(self):

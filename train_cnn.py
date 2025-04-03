@@ -58,8 +58,8 @@ class TrainingModel(torch.nn.Module):
 
         # use leakyRelu to avoid dead neurons from negative inputs after normalization of the images
 
-        conv_channels = 16
-        conv_kernel_size = 5
+        conv_channels = 64
+        conv_kernel_size = 3
         conv_padding = 0
         conv_stride = 1
         pooling_kernel_size = 3
@@ -382,7 +382,7 @@ def visualize_layer_weights(layer : torch.nn.Module , img : torch.Tensor):
             row, col = divmod(i, 4)
 
             # make filtered images bigger
-            larger_img = cv2.resize(filtered_imgs[i].numpy(), (400, 400), interpolation=cv2.INTER_LINEAR)
+            larger_img = cv2.resize(filtered_imgs[i].cpu().numpy(), (400, 400), interpolation=cv2.INTER_LINEAR)
             axes[row, col].imshow(larger_img, cmap='gray')
             axes[row, col].axis('off')
         
