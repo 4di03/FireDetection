@@ -107,6 +107,18 @@ class VideoData:
 # video data which is a list of tensors (each tensor is a video) and a boolean (True if fire, False if no fire) for each video
 VideoData = List[torch.Tensor]
 
+def load_frames_from_video(video_path : str) -> torch.Tensor:
+    """
+    Reads a tensor of frames from a video at a given path.
+    Args:
+        video_path (str) : the file path of the video to read
+    Returns:
+        frames (torch.Tensor) : a tensor of shape [T, C, H, W] representing the video data
+    """
+    frames, _, _ = torchvision.io.read_video(video_path)  # frames: [T, H, W, C]
+    # resize image to [T, C, H , W]
+    return frames.permute([0,3,1,2])
+
 def get_video_data(videos_path : str =FIRE_VIDEOS_DATA_PATH + "/validation" ) -> Tuple[torch.Tensor, torch.Tensor]:
     """
     Reads videos from directory and returns a tuple of tensors containing image data.
@@ -130,18 +142,14 @@ def get_video_data(videos_path : str =FIRE_VIDEOS_DATA_PATH + "/validation" ) ->
     
         for pos_video in os.listdir(os.path.join(videos_path, "pos")):
             pos_video_path = os.path.join(videos_path, "pos", pos_video)
-            frames, _, _ = torchvision.io.read_video(pos_video_path)  # frames: [T, H, W, C]
-            # resize image to [T, C, H , W]
-            frames = frames.permute([0,3,1,2])
-    
+
+            frames =load_frames_from_video(pos_video_path)
             pos_videos.append(frames)  # Append the frames tensor to the list
     
         neg_videos = []
         for neg_video in os.listdir(os.path.join(videos_path, "neg")):
             neg_video_path = os.path.join(videos_path, "neg", neg_video)
-            frames, _, _ = torchvision.io.read_video(neg_video_path)  # frames: [T, H, W, C]
-            # resize image to [T, C, H , W]
-            frames = frames.permute([0,3,1,2])
+            frames =load_frames_from_video(neg_video_path)
             
             neg_videos.append(frames)  # Append the frames tensor to the list
             

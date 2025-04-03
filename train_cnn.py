@@ -84,10 +84,6 @@ class TrainingModel(torch.nn.Module):
             torch.nn.MaxPool2d(kernel_size=pooling_kernel_size, stride=pooling_stride),
             torch.nn.LeakyReLU(),
             torch.nn.Dropout(p=dropout_prob),
-            # torch.nn.Conv2d(conv_channels, conv_channels, kernel_size=conv_kernel_size, stride=conv_stride, padding = conv_padding),
-            # torch.nn.LeakyReLU(),
-            # torch.nn.Dropout(p=dropout_prob),
-            # reduce to 1 feature map to extract most important features
             torch.nn.Conv2d(conv_channels, final_conv_feature_maps, kernel_size=conv_kernel_size, stride=conv_stride, padding = conv_padding),
             torch.nn.LeakyReLU(),
             torch.nn.Dropout(p=dropout_prob),
@@ -368,7 +364,7 @@ def visualize_layer_weights(layer : torch.nn.Module , img : torch.Tensor, max_fi
     """
     # get module twice cause its a sequential nested in another sequential
     filters = layer.weight  # shape (num_filters, 3, 3, 3)
-    filters = random.sample(list(filters), max_filters)  # random sample of filters so that we have max_filters
+    filters = torch.stack(random.sample(list(filters), max_filters))  # random sample of filters so that we have max_filters
 
 
     img = img.unsqueeze(0)        # (1, 3, 244, 244) - add batch dimension
@@ -403,7 +399,7 @@ def visualize_layer_output(layer:torch.nn.Module, raw_img : torch.Tensor, transf
 
     """
     # show original image
-    img = raw_img.cpu().numpy()
+    img = raw_img.cpu().permute(1, 2, 0).numpy()
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     img = cv2.resize(img, (400, 400), interpolation=cv2.INTER_LINEAR)
     plt.imshow(img)

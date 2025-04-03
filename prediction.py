@@ -9,7 +9,7 @@ import torch
 from typing import List, Tuple
 from video_model import VideoModel
 from train_cnn import InferenceModel
-
+import time
 
 def get_metrics(predictions : List[float], labels : List[float], threshold : float) -> Tuple[float,float, float]:
     """
@@ -48,7 +48,7 @@ def get_metrics(predictions : List[float], labels : List[float], threshold : flo
 
 
 
-def get_predictions_on_videos(model : VideoModel, videos : List[torch.Tensor]) -> List[List[float], float, int]:
+def get_predictions_on_videos(model : VideoModel, videos : List[torch.Tensor]) -> Tuple[List[List[float]], float, int]:
     """
     Get fire probility predictions for each frame in the video.
     Args:
