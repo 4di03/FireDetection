@@ -6,17 +6,55 @@ Final Project
 File containg functions for running predictions on videos and getting performance metrics.
 """
 import torch 
-from typing import List
+from typing import List, Tuple
 from video_model import VideoModel
+from train_cnn import InferenceModel
 
-def get_predictions(model : VideoModel, videos : List[torch.Tensor]) -> List[List[float]]:
+
+def get_metrics(predictions : List[float], labels : List[float], threshold : float) -> Tuple[float,float, float]:
+    """
+    Get metrics for the model predictions using the given threshold.
+    Args:
+        predictions (List[float]): List of predictions for each image
+        labels (List[float]): List of labels for each image (1 for fire, 0 for no fire)
+        threshold (float): The threshold to use for determining fire.
+    Returns:
+        float: The recall for the model predictions.
+        float: The false positive rate for the model predictions.
+        float: The accuracy for the model predictions.
+    """
+    tp = 0
+    fn = 0
+    fp = 0
+    tn = 0
+    total = len(predictions)
+    
+    for i in range(total):
+        if predictions[i] >= threshold and labels[i] == 1:
+            tp += 1
+        elif predictions[i] < threshold and labels[i] == 0:
+            tn += 1
+        elif predictions[i] >= threshold and labels[i] == 0:
+            fp += 1
+        elif predictions[i] < threshold and labels[i] == 1:
+            fn += 1
+
+    recall = tp / (tp + fn)
+    accuracy = (tp + tn) / total
+    false_positive_rate = fp / (fp + tn)
+
+    return recall,false_positive_rate, accuracy
+
+
+
+def get_predictions_on_videos(model : VideoModel, videos : List[torch.Tensor]) -> List[List[float]]:
     """
     Get fire probility predictions for each frame in the video.
     Args:
         model (VideoModel): The model to use for predictions.
         videos (List[torch.Tensor]): List of videos to predict on.
     Returns:
-        List[float]: List of predictions for each frame in the video.
+        List[List[float]]: List of predictions for each frame in the video.
     """
     predictions = []
     for video in videos:

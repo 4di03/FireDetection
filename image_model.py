@@ -19,7 +19,7 @@ class ImageModel(ABC):
         Predicts the fire probability for the given image.
 
         Args:
-            image: The input image to be processed.
+            image: The input image to be processed. This image is not preprocessed.
 
         Returns:
             A float representing the fire probability for the entire image.

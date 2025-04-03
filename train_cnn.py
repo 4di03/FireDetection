@@ -8,32 +8,14 @@ Contains functionality for training CNN models for fire detection from images.
 
 from cnn import CNNFireDetector
 import torch
-from data_extraction import ImageData, get_image_data
+from data_extraction import FireDataset, TARGET_IMAGE_SIZE, TRANSFORM
 import dataclasses
 from typing import List, Tuple
 import matplotlib.pyplot as plt
-from torchvision import transforms
-from torch.utils.data import Dataset
 import torch.nn.functional as F
 import cv2
-# size that we resize the images (square) to before passing to the model
-TARGET_IMAGE_SIZE = 128
 
 
-TRANSFORM = transforms.Compose([ 
-                                # conver to float tensor in range [0,1]
-                                transforms.Lambda(lambda x: x.float()/255.0),
-                                # resize to 224x224
-                                transforms.Lambda(lambda x: 
-                                                  F.interpolate(x.unsqueeze(0), 
-                                                                size=(TARGET_IMAGE_SIZE, TARGET_IMAGE_SIZE), 
-                                                                mode='bilinear', 
-                                                                align_corners=False).squeeze(0)),
-                                # normalize based on imagenet mean and std
-                                transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                                    std=[0.229, 0.224, 0.225])])
-
-# TODO: consider recalcualating mean and std for the dataset if these do not work well
 
 
 def calculate_conv_output_size(model : torch.nn.Module , input_size : Tuple[int, int, int]) -> int:
@@ -160,20 +142,11 @@ class InferenceModel(torch.nn.Module):
         We apply the approporiate preprocessing transform to x or the batch of images in x and then 
         pass it to the trained_model.
 
-        TODO: consider batch preprpeocessing if this is too slow.
         Args:
-            x : image tensor or batch of image tensors
+            x : image tensor or batch of image tensors, should be preprocessed before passing to the model
         Returns:
             float for fire probability between 0 and 1
         """
-        if len(x.shape) == 3:
-            # Single image: (3, H, W)
-            x = self.transform(x).unsqueeze(0)  # Make it (1, 3, H, W)
-        elif len(x.shape) == 4:
-            # Batch of images: (B, 3, H, W)
-            x = torch.stack([self.transform(img) for img in x])
-        else:
-            raise ValueError("Expected input of shape (3, H, W) or (B, 3, H, W)")
     
         return torch.sigmoid(self.trained_model(x))
 
@@ -249,40 +222,20 @@ class XYData:
         return self.y[self.x.index(max(self.x))]
     
 
-
-class FireDataset(Dataset):
-    """ Custom dataset for binary classification from images"""
-    def __init__(self, data: ImageData, transform : torch.nn.Module = None):
-        self.data = data
-        self.transform = transform
-
-    def __len__(self):
-        return len(self.data)
-
-
-    def __getitem__(self, idx):
-        image, label = self.data[idx]
-
-        # apply preprocessing to the image
-        if self.transform:
-            image = self.transform(image)
-
-        label_tensor = torch.tensor(int(label), dtype=torch.float32)  # or long if using CrossEntropyLoss
-        return image, label_tensor
     
 
 
 def train_cnn(model_and_transform :ModelWithTransform ,
               training_parameters : TrainingParameters,
-              train_image_data : ImageData, 
-              validation_image_data: ImageData) -> Tuple[XYData, XYData, CNNFireDetector]:
+              train_image_data : FireDataset, 
+              validation_image_data: FireDataset) -> Tuple[XYData, XYData, CNNFireDetector]:
     """
     Trains a CNN model for fire detection with the given training data.
     Args:
         model (torch.nn.Module): The CNN model to train.
         training_parameters (TrainingParameters): The training hyperparameters.
-        train_image_data (ImageData): The training data.
-        validation_image_data (ImageData): The validation data used to adjust hyperparameters.
+        train_image_data (FireDataset): The training data.
+        validation_image_data (FireDataset): The validation data used to adjust hyperparameters.
     Returns:
         Tuple[XYData, XYData, CNNFireDetector]: A tuple containing:
             - train_loss_plot: The training loss data.
@@ -298,10 +251,10 @@ def train_cnn(model_and_transform :ModelWithTransform ,
     transform = model_and_transform.transform
 
     # Create data loaders for training and validation data
-    train_dataloader = torch.utils.data.DataLoader(FireDataset(train_image_data, transform), batch_size=training_parameters.batch_size, shuffle=True)
+    train_dataloader = torch.utils.data.DataLoader(train_image_data, batch_size=training_parameters.batch_size, shuffle=True)
 
     # validation data is a single batch with the entire epoch
-    val_dataloader = torch.utils.data.DataLoader(FireDataset(validation_image_data, transform), batch_size=len(validation_image_data), shuffle=False)
+    val_dataloader = torch.utils.data.DataLoader(validation_image_data, batch_size=len(validation_image_data), shuffle=False)
 
     # Train the network
     for epoch_index in range(training_parameters.n_epochs):  # loop over the dataset multiple times
@@ -358,7 +311,9 @@ def train_cnn(model_and_transform :ModelWithTransform ,
 
     inference_model = InferenceModel(model, transform)
 
-    model = CNNFireDetector(inference_model)
+    model = CNNFireDetector(inference_model, 
+                            device = training_parameters.device, 
+                            transform = transform)
 
     return train_loss_plot, val_loss_plot, model
 
