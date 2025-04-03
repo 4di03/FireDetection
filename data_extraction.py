@@ -20,6 +20,24 @@ ImageData = List[Tuple[torch.Tensor, bool]]
 # video data which is a list of tensors (each tensor is a video) and a boolean (True if fire, False if no fire) for each video
 VideoData = List[torch.Tensor]
 
+def save_image_data(data : ImageData, file_name : str):
+    """
+    Store images and label tensors at a path with the given file name
+
+    Args:
+        data (ImageData) : the list of tuple of images and labels
+        file_name (str) : prefix of file path where you will save the images and labels
+    
+    """
+    stacked_features = torch.stack([sample[0] for sample in data])
+    stacked_labels = torch.tensor([sample[1] for sample in data , dtype=torch.float32)
+
+    features_fp = f"{stacked_features}_imgs.pt"
+    labels_fp = f"{stacked_labels}_labels.pt"
+    
+    torch.save(stacked_features, features_fp)
+    torch.save(stacked_labels, labels_fp)
+
 
 
 def get_video_data(videos_path : str =FIRE_VIDEOS_DATA_PATH + "/validation" ) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -138,6 +156,7 @@ def get_image_data(n_total_samples = 1000) -> Tuple[ImageData, ImageData, ImageD
     all_images = fire_images + nofire_images
     random.shuffle(all_images)
 
+    n_total_samples = len(all_images)
     # split into train, val, test
     n_train_samples = int(n_total_samples * 0.8)
     n_val_samples = int(n_total_samples * 0.1)
