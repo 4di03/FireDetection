@@ -64,7 +64,7 @@ class CNNFireDetector(ImageModel):
         """
         Load the model from a file.
         """
-        model.load_state_dict(torch.load(filename))
-        
+        # load model on cpu
+        model.load_state_dict(torch.load(filename, map_location=torch.device('cpu')))
         return CNNFireDetector(model, **kwargs)
     

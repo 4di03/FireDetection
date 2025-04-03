@@ -6,6 +6,7 @@ Final Project
 Contains functionality for training CNN models for fire detection from images.
 """
 
+import random
 from cnn import CNNFireDetector
 import torch
 from data_extraction import FireDataset, TARGET_IMAGE_SIZE, TRANSFORM
@@ -356,18 +357,19 @@ def visualize_loss_curve(training_loss : XYData, val_loss : XYData):
     plt.show()
 
 
-def visualize_layer_weights(layer : torch.nn.Module , img : torch.Tensor):
+def visualize_layer_weights(layer : torch.nn.Module , img : torch.Tensor, max_filters : int = 8):
     """
     Visualize the first layer weights of the model.
     Args:
         model (TrainingModel): The model to visualize.
-        img (torch.Tensor): The image to visualize the weights on.
+        img (torch.Tensor): The image to visualize the weights on (must be preprocessed to be able to fed directly to layer).
+        max_filters (int): The maximum number of filters to visualize.
     
     """
     # get module twice cause its a sequential nested in another sequential
     filters = layer.weight  # shape (num_filters, 3, 3, 3)
-    print("Filters shape: ", filters.shape)
-    print(filters.shape)
+    filters = random.sample(list(filters), max_filters)  # random sample of filters so that we have max_filters
+
 
     img = img.unsqueeze(0)        # (1, 3, 244, 244) - add batch dimension
     
@@ -390,3 +392,23 @@ def visualize_layer_weights(layer : torch.nn.Module , img : torch.Tensor):
         plt.show()    
 
     
+def visualize_layer_output(layer:torch.nn.Module, raw_img : torch.Tensor, transform : torch.nn.Module, device : torch.device = torch.device("cpu")):
+    """
+    Visualize the output of a layer in the model on a given image.
+    First show the original image, then apply the transform to the image and visualize the output of the layer.
+    Args:
+        layer (torch.nn.Module): The layer to visualize.
+        raw_img (torch.Tensor): The image to visualize the output on (must be preprocessed to be able to fed directly to layer).
+        transform (torch.nn.Module): The transform to apply to the image before passing it to the layer.
+
+    """
+    # show original image
+    img = raw_img.cpu().numpy()
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    img = cv2.resize(img, (400, 400), interpolation=cv2.INTER_LINEAR)
+    plt.imshow(img)
+    plt.axis('off')
+    plt.title("Original Image")
+    plt.show()
+    # apply transform to image and visualize the output of the layer
+    visualize_layer_weights(layer, transform(raw_img).to(device), max_filters=8)
