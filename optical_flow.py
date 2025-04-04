@@ -41,7 +41,7 @@ class FarnebackOpticalFlowModel(VideoModel):
             frames: A list of tensors representing the frames in the video stream. The last frame is the most recent one for which the prediction is made.
         Returns:
             A float representing the fire probability for the last frame in the video stream.
-        
+            This can be thought of as the % of total motion in the image that is made up of fire-like motion
         """
         if len(frames) < 2:
             return 0.0
@@ -74,21 +74,11 @@ class FarnebackOpticalFlowModel(VideoModel):
             return 0.0
 
         # normalize the total flow magnitude to a value between 0 and 1 based on a flow across the entire frame
-        
+        # this can be thought of as the % of total motion that is made up of fire-like motion
         fire_prob = flow_magnitude_in_fire / total_flow_magnitude
 
-        # show the flow field and the original frame and the fire mask
-
-         # Convert flow to HSV for visualization
-        hsv = np.zeros_like(target_frame_np)
-        hsv[..., 1] = 255  # full saturation
-
-        hsv[..., 0] = angle * 180 / np.pi / 2  # direction
-        hsv[..., 2] = cv2.normalize(magnitude, None, 0, 255, cv2.NORM_MINMAX)  # magnitude
-        flow_rgb = cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
-
-
         if DEBUG:
+            # show the flow field and the original frame and the fire mask
             cv2.imshow("Flow Field", draw_flow_on_white(flow, target_frame_np.shape[:2]))
             cv2.imshow("Original Frame", cv2.cvtColor(target_frame_np, cv2.COLOR_BGR2RGB))
             cv2.imshow("Fire Mask", fire_mask)

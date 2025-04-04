@@ -9,9 +9,7 @@ import random
 import dataclasses
 from torch.utils.data import Dataset
 
-#DFIRE_DATA_PATH = "data/D-Fire"
 PLACES_DATA_PATH = "data/data_256"
-#FIRE_DATA_PATH = "data/fire_dataset"
 FIRE_VIDEOS_DATA_PATH = "data/fire_videos"
 FIRE_IMAGE_DATA_PATH = "data/Fire_Detection.v1.coco/train/"
 TENSOR_CACHE_PATH = "data/tensor_cache"
