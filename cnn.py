@@ -46,8 +46,8 @@ class CNNFireDetector(ImageModel):
             image = self.transform(image).unsqueeze(0)  # Add batch dimension
         else:
             print("No transform provided")
-
-        return self.model(image).item()
+        with torch.no_grad():
+            return self.model(image).item()
     
 
     def save_to_file(self, filename: str):
