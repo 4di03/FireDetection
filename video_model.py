@@ -32,7 +32,7 @@ class VideoModel(ABC):
         """
         Predicts the fire probability for each frame in the given video stream.
         Args:
-            video: A list of tensors representing the frames in the video stream.
+            video: A list of tensors representing the frames in the video stream. The tensors are unprocessed and will be passed to the model as is.
 
         Returns:
             A list of floats representing the fire probability for each frame in the video stream.

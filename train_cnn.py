@@ -6,33 +6,17 @@ Final Project
 Contains functionality for training CNN models for fire detection from images.
 """
 
+import random
 from cnn import CNNFireDetector
 import torch
-from data_extraction import ImageData, get_image_data
-import sys
+from data_extraction import FireDataset, TARGET_IMAGE_SIZE, TRANSFORM
 import dataclasses
 from typing import List, Tuple
 import matplotlib.pyplot as plt
-from torchvision import transforms
-from torch.utils.data import Dataset
 import torch.nn.functional as F
 import cv2
-# preprocessing step for images
-TARGET_IMAGE_SIZE = 64
-TRANSFORM = transforms.Compose([ 
-                                # conver to float tensor in range [0,1]
-                                transforms.Lambda(lambda x: x.float()/255.0),
-                                # resize to 224x224
-                                transforms.Lambda(lambda x: 
-                                                  F.interpolate(x.unsqueeze(0), 
-                                                                size=(TARGET_IMAGE_SIZE, TARGET_IMAGE_SIZE), 
-                                                                mode='bilinear', 
-                                                                align_corners=False).squeeze(0)),
-                                # normalize based on imagenet mean and std
-                                transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                                    std=[0.229, 0.224, 0.225])])
 
-# TODO: consider recalcualating mean and std for the dataset if these do not work well
+
 
 
 def calculate_conv_output_size(model : torch.nn.Module , input_size : Tuple[int, int, int]) -> int:
@@ -55,9 +39,9 @@ def calculate_conv_output_size(model : torch.nn.Module , input_size : Tuple[int,
     with torch.no_grad():
         # Pass the dummy input through the model
         output = model(dummy_input)
-        
-        # Get the size of the output after flattening
-        output_size = output.numel()
+    
+    # Get the size of the output after flattening
+    output_size = output.numel()
         
     return output_size
 
@@ -75,17 +59,34 @@ class TrainingModel(torch.nn.Module):
 
         # use leakyRelu to avoid dead neurons from negative inputs after normalization of the images
 
+        conv_channels = 64
+        conv_kernel_size = 3
+        conv_padding = 0
+        conv_stride = 1
+        pooling_kernel_size = 3
+        pooling_stride = 2
+
+        final_conv_feature_maps = 8
+        dropout_prob = 0.5
+
+        fc_nodes = 64
+        # TODO: rearchitectu model to use dropout, and not be a copy of source 150 
+        # things to try: - skip connections, residual connections, batch normalization, dropout
+        # change train /test/val to 80/10/10
+        # try different hyperparameters
+        # try not to shrink all the way to 1 feature map, have more fully connected nodes
+
         self.convolutional_layers = torch.nn.Sequential(
-            torch.nn.Conv2d(3, 16, kernel_size=3, stride=1),
+            torch.nn.Conv2d(3, conv_channels, kernel_size=conv_kernel_size, stride=conv_stride, padding = conv_padding),
             torch.nn.LeakyReLU(),
-            torch.nn.Conv2d(16, 16, kernel_size=3, stride=1),
-            torch.nn.MaxPool2d(kernel_size=3, stride=2),
+            torch.nn.Dropout(p=dropout_prob),
+            torch.nn.Conv2d(conv_channels, conv_channels, kernel_size=conv_kernel_size, stride=conv_stride, padding = conv_padding),
+            torch.nn.MaxPool2d(kernel_size=pooling_kernel_size, stride=pooling_stride),
             torch.nn.LeakyReLU(),
-            torch.nn.Conv2d(16, 16, kernel_size=3, stride=1),
+            torch.nn.Dropout(p=dropout_prob),
+            torch.nn.Conv2d(conv_channels, final_conv_feature_maps, kernel_size=conv_kernel_size, stride=conv_stride, padding = conv_padding),
             torch.nn.LeakyReLU(),
-            torch.nn.Conv2d(16, 1, kernel_size=3, stride=1),
-            torch.nn.MaxPool2d(kernel_size=3, stride=2),
-            torch.nn.LeakyReLU(),
+            torch.nn.Dropout(p=dropout_prob),
             torch.nn.Flatten()
         )
 
@@ -93,19 +94,27 @@ class TrainingModel(torch.nn.Module):
         conv_layers_output_size = calculate_conv_output_size(self.convolutional_layers, (3, TARGET_IMAGE_SIZE, TARGET_IMAGE_SIZE))
 
         self.sequential_layers = torch.nn.Sequential(
-            torch.nn.Linear(conv_layers_output_size, 100),
+            torch.nn.Linear(conv_layers_output_size, fc_nodes),
             torch.nn.LeakyReLU(),
-            torch.nn.Linear(100, 100),
+            torch.nn.Dropout(p=dropout_prob),
+            torch.nn.Linear(fc_nodes, fc_nodes),
             torch.nn.LeakyReLU(),
-            torch.nn.Linear(100, 1)
+            torch.nn.Dropout(p=dropout_prob),
+            torch.nn.Linear(fc_nodes, 1)
             # don't apply sigmoid here, we will do it in InferenceModel and instead we use BCEWithLogitsLoss for training
         )
+
+    
 
 
         self.net = torch.nn.Sequential(
             self.convolutional_layers,
             self.sequential_layers
         )
+
+        # print number of parameters in the model
+        num_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
+        print(f"Number of parameters in the model: {num_params}")
 
     def forward(self, x):
         return self.net(x)
@@ -130,20 +139,11 @@ class InferenceModel(torch.nn.Module):
         We apply the approporiate preprocessing transform to x or the batch of images in x and then 
         pass it to the trained_model.
 
-        TODO: consider batch preprpeocessing if this is too slow.
         Args:
-            x : image tensor or batch of image tensors
+            x : image tensor or batch of image tensors, should be preprocessed before passing to the model
         Returns:
             float for fire probability between 0 and 1
         """
-        if len(x.shape) == 3:
-            # Single image: (3, H, W)
-            x = self.transform(x).unsqueeze(0)  # Make it (1, 3, H, W)
-        elif len(x.shape) == 4:
-            # Batch of images: (B, 3, H, W)
-            x = torch.stack([self.transform(img) for img in x])
-        else:
-            raise ValueError("Expected input of shape (3, H, W) or (B, 3, H, W)")
     
         return torch.sigmoid(self.trained_model(x))
 
@@ -156,6 +156,7 @@ class TrainingParameters:
     loss_function : torch.nn.Module
     batch_size : int
     n_epochs : int
+    scheduler : torch.optim.lr_scheduler = None # learning rate scheduler, default is None
     early_stopping_threshold : float = 1e-3 # threshold for which we stop trianing if loss is less change is less than this for consecutive epochs where loss is decreasing, set to 0 to disable
     device : torch.device = torch.device("cpu") # device to use for training, default is cpu
 
@@ -218,40 +219,20 @@ class XYData:
         return self.y[self.x.index(max(self.x))]
     
 
-
-class FireDataset(Dataset):
-    """ Custom dataset for binary classification from images"""
-    def __init__(self, data: ImageData, transform : torch.nn.Module = None):
-        self.data = data
-        self.transform = transform
-
-    def __len__(self):
-        return len(self.data)
-
-
-    def __getitem__(self, idx):
-        image, label = self.data[idx]
-
-        # apply preprocessing to the image
-        if self.transform:
-            image = self.transform(image)
-
-        label_tensor = torch.tensor(int(label), dtype=torch.float32)  # or long if using CrossEntropyLoss
-        return image, label_tensor
     
 
 
 def train_cnn(model_and_transform :ModelWithTransform ,
               training_parameters : TrainingParameters,
-              train_image_data : ImageData, 
-              validation_image_data: ImageData) -> Tuple[XYData, XYData, CNNFireDetector]:
+              train_image_data : FireDataset, 
+              validation_image_data: FireDataset) -> Tuple[XYData, XYData, CNNFireDetector]:
     """
     Trains a CNN model for fire detection with the given training data.
     Args:
         model (torch.nn.Module): The CNN model to train.
         training_parameters (TrainingParameters): The training hyperparameters.
-        train_image_data (ImageData): The training data.
-        validation_image_data (ImageData): The validation data used to adjust hyperparameters.
+        train_image_data (FireDataset): The training data.
+        validation_image_data (FireDataset): The validation data used to adjust hyperparameters.
     Returns:
         Tuple[XYData, XYData, CNNFireDetector]: A tuple containing:
             - train_loss_plot: The training loss data.
@@ -267,10 +248,10 @@ def train_cnn(model_and_transform :ModelWithTransform ,
     transform = model_and_transform.transform
 
     # Create data loaders for training and validation data
-    train_dataloader = torch.utils.data.DataLoader(FireDataset(train_image_data, transform), batch_size=training_parameters.batch_size, shuffle=True)
+    train_dataloader = torch.utils.data.DataLoader(train_image_data, batch_size=training_parameters.batch_size, shuffle=True)
 
     # validation data is a single batch with the entire epoch
-    val_dataloader = torch.utils.data.DataLoader(FireDataset(validation_image_data, transform), batch_size=len(validation_image_data), shuffle=False)
+    val_dataloader = torch.utils.data.DataLoader(validation_image_data, batch_size=len(validation_image_data), shuffle=False)
 
     # Train the network
     for epoch_index in range(training_parameters.n_epochs):  # loop over the dataset multiple times
@@ -303,7 +284,15 @@ def train_cnn(model_and_transform :ModelWithTransform ,
 
 
         # predict on validation data after each epoch
-        val_losses.append(get_total_avg_loss(model, val_dataloader, training_parameters.loss_function))
+        val_loss = get_total_avg_loss(model, val_dataloader, training_parameters.loss_function)
+        val_losses.append(val_loss)
+        if training_parameters.scheduler is not None:
+            # update the learning rate if using a scheduler
+            training_parameters.scheduler.step(val_loss)  # step the scheduler if using one
+
+            
+
+
 
         print(f"Epoch {epoch_index + 1} completed. Train loss: {cur_epoch_train_loss:.4f}, Validation loss: {val_losses[-1]:.4f}")
 
@@ -319,7 +308,9 @@ def train_cnn(model_and_transform :ModelWithTransform ,
 
     inference_model = InferenceModel(model, transform)
 
-    model = CNNFireDetector(inference_model)
+    model = CNNFireDetector(inference_model, 
+                            device = training_parameters.device, 
+                            transform = transform)
 
     return train_loss_plot, val_loss_plot, model
 
@@ -362,18 +353,19 @@ def visualize_loss_curve(training_loss : XYData, val_loss : XYData):
     plt.show()
 
 
-def visualize_layer_weights(layer : torch.nn.Module , img : torch.Tensor):
+def visualize_layer_weights(layer : torch.nn.Module , img : torch.Tensor, max_filters : int = 8):
     """
     Visualize the first layer weights of the model.
     Args:
         model (TrainingModel): The model to visualize.
-        img (torch.Tensor): The image to visualize the weights on.
+        img (torch.Tensor): The image to visualize the weights on (must be preprocessed to be able to fed directly to layer).
+        max_filters (int): The maximum number of filters to visualize.
     
     """
     # get module twice cause its a sequential nested in another sequential
     filters = layer.weight  # shape (num_filters, 3, 3, 3)
-    print("Filters shape: ", filters.shape)
-    print(filters.shape)
+    filters = torch.stack(random.sample(list(filters), max_filters))  # random sample of filters so that we have max_filters
+
 
     img = img.unsqueeze(0)        # (1, 3, 244, 244) - add batch dimension
     
@@ -388,7 +380,7 @@ def visualize_layer_weights(layer : torch.nn.Module , img : torch.Tensor):
             row, col = divmod(i, 4)
 
             # make filtered images bigger
-            larger_img = cv2.resize(filtered_imgs[i].numpy(), (400, 400), interpolation=cv2.INTER_LINEAR)
+            larger_img = cv2.resize(filtered_imgs[i].cpu().numpy(), (400, 400), interpolation=cv2.INTER_LINEAR)
             axes[row, col].imshow(larger_img, cmap='gray')
             axes[row, col].axis('off')
         
@@ -396,3 +388,23 @@ def visualize_layer_weights(layer : torch.nn.Module , img : torch.Tensor):
         plt.show()    
 
     
+def visualize_layer_output(layer:torch.nn.Module, raw_img : torch.Tensor, transform : torch.nn.Module, device : torch.device = torch.device("cpu")):
+    """
+    Visualize the output of a layer in the model on a given image.
+    First show the original image, then apply the transform to the image and visualize the output of the layer.
+    Args:
+        layer (torch.nn.Module): The layer to visualize.
+        raw_img (torch.Tensor): The image to visualize the output on (must be preprocessed to be able to fed directly to layer).
+        transform (torch.nn.Module): The transform to apply to the image before passing it to the layer.
+
+    """
+    # show original image
+    img = raw_img.cpu().permute(1, 2, 0).numpy()
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    img = cv2.resize(img, (400, 400), interpolation=cv2.INTER_LINEAR)
+    plt.imshow(img)
+    plt.axis('off')
+    plt.title("Original Image")
+    plt.show()
+    # apply transform to image and visualize the output of the layer
+    visualize_layer_weights(layer, transform(raw_img).to(device), max_filters=8)

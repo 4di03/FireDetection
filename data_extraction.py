@@ -3,9 +3,11 @@ import torch
 import torchvision.io
 import os
 import matplotlib.pyplot as plt
-import torchvision.transforms.functional as F
+import torch.nn.functional as F
+from torchvision import transforms
 import random
-
+import dataclasses
+from torch.utils.data import Dataset
 
 #DFIRE_DATA_PATH = "data/D-Fire"
 PLACES_DATA_PATH = "data/data_256"
@@ -14,13 +16,108 @@ FIRE_VIDEOS_DATA_PATH = "data/fire_videos"
 FIRE_IMAGE_DATA_PATH = "data/Fire_Detection.v1.coco/train/"
 TENSOR_CACHE_PATH = "data/tensor_cache"
 
-# image data which is an image tensor and a boolean (True if fire, False if no fire) for each image
-ImageData = List[Tuple[torch.Tensor, bool]]
+# preprocessing transform to apply to the images before passing to the model. Does not change the number of dimensions of the image
+TRANSFORM = transforms.Compose([ 
+                                # conver to float tensor in range [0,1]
+                                transforms.Lambda(lambda x: x.float()/255.0),
+                                # resize to 224x224
+                                transforms.Lambda(lambda x: 
+                                                  F.interpolate(x.unsqueeze(0), 
+                                                                size=(TARGET_IMAGE_SIZE, TARGET_IMAGE_SIZE), 
+                                                                mode='bilinear', 
+                                                                align_corners=False).squeeze(0)),
+                                # normalize based on ImageNet mean and std
+                                transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                                    std=[0.229, 0.224, 0.225])])
+# TODO: consider recalcualating mean and std for the dataset if these do not work well
+
+
+# size that we resize the images (square) to before passing to the model
+TARGET_IMAGE_SIZE = 128
+
+
+class FireDataset(Dataset):
+    """
+    Class to hold image dataset
+    Attributes:
+        image_data (torch.Tensor): Tensor representing the image which has been preprocessed before hand (B, C, H, W).
+        is_fire (torch.Tensor): tensor of 1s and 0s representing fire (1) or no fire (0) of length B.
+    """
+    images: torch.Tensor
+    labels: torch.Tensor
+
+    def __init__(self, images: torch.Tensor, labels: torch.Tensor):
+        """
+        Args:
+            images (torch.Tensor): Tensor representing the image which has been preprocessed before hand (B, C, H, W).
+            labels (torch.Tensor): tensor of 1s and 0s representing fire (1) or no fire (0) of length B.
+        """
+        self.images = images
+        self.labels = labels
+        if self.images.shape[0] != self.labels.shape[0]:
+            raise ValueError("The number of images and labels must be the same.")
+
+    @staticmethod
+    def init_from_data_name(data_name : str) -> "FireDataset":
+        """
+        Initalize a datset given the name of the tensors for images and labels.
+        Args:
+            data_name (str): The name of the dataset to load.
+        Returns:
+            FireDataset
+        """
+        images = torch.load(os.path.join(TENSOR_CACHE_PATH, f"{data_name}_images.pt"))
+        labels = torch.load(os.path.join(TENSOR_CACHE_PATH, f"{data_name}_labels.pt"))
+        return FireDataset(images, labels)
+
+
+    def __len__(self):
+        return len(self.images)
+
+    def __getitem__(self, index):
+        """
+        Returns the image and label at the given index.
+        Args:
+            index (int): The index of the image and label to return.
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor]: A tuple containing the image tensor and the label tensor.    
+        """
+        return self.images[index], self.labels[index]
+
+    def save(self, file_name: str):
+        """
+        Save the dataset to a file.
+        Args:
+            file_name (str): The name of the file to save the dataset to.
+        """
+        torch.save(self.images, file_name + "_images.pt")
+        torch.save(self.labels, file_name + "_labels.pt")
+
+class VideoData:
+    """
+    Class to hold video data
+    Attributes:
+        video_data (List[torch.Tensor]): List of tensors representing videos.
+        is_fire (bool): True if fire, False if no fire.
+    """
+    video_data: List[torch.Tensor]
+    is_fire: bool
+
 
 # video data which is a list of tensors (each tensor is a video) and a boolean (True if fire, False if no fire) for each video
 VideoData = List[torch.Tensor]
 
-
+def load_frames_from_video(video_path : str) -> torch.Tensor:
+    """
+    Reads a tensor of frames from a video at a given path.
+    Args:
+        video_path (str) : the file path of the video to read
+    Returns:
+        frames (torch.Tensor) : a tensor of shape [T, C, H, W] representing the video data
+    """
+    frames, _, _ = torchvision.io.read_video(video_path)  # frames: [T, H, W, C]
+    # resize image to [T, C, H , W]
+    return frames.permute([0,3,1,2])
 
 def get_video_data(videos_path : str =FIRE_VIDEOS_DATA_PATH + "/validation" ) -> Tuple[torch.Tensor, torch.Tensor]:
     """
@@ -45,18 +142,14 @@ def get_video_data(videos_path : str =FIRE_VIDEOS_DATA_PATH + "/validation" ) ->
     
         for pos_video in os.listdir(os.path.join(videos_path, "pos")):
             pos_video_path = os.path.join(videos_path, "pos", pos_video)
-            frames, _, _ = torchvision.io.read_video(pos_video_path)  # frames: [T, H, W, C]
-            # resize image to [T, C, H , W]
-            frames = frames.permute([0,3,1,2])
-    
+
+            frames =load_frames_from_video(pos_video_path)
             pos_videos.append(frames)  # Append the frames tensor to the list
     
         neg_videos = []
         for neg_video in os.listdir(os.path.join(videos_path, "neg")):
             neg_video_path = os.path.join(videos_path, "neg", neg_video)
-            frames, _, _ = torchvision.io.read_video(neg_video_path)  # frames: [T, H, W, C]
-            # resize image to [T, C, H , W]
-            frames = frames.permute([0,3,1,2])
+            frames =load_frames_from_video(neg_video_path)
             
             neg_videos.append(frames)  # Append the frames tensor to the list
             
@@ -107,15 +200,52 @@ def get_random_img_file_data(directory, n) -> List[torch.Tensor]:
                              random.sample(jpg_files, min(n, len(jpg_files)))))
     return image_tensors
 
-def get_image_data(n_total_samples = 1000) -> Tuple[ImageData, ImageData, ImageData]:
+ImageData = List[Tuple[torch.Tensor, bool]]
+
+
+def preprocess_data(image_data: ImageData) -> Tuple[FireDataset, FireDataset, FireDataset]:
     """
-    Generate random data for training and testing.
+    Preprocess the image data and split it into train, validation, and test sets.
+    Args:
+        image_data (ImageData): The image data to preprocess.
+    Returns:
+        Tuple[FireDataset, FireDataset, FireDataset]: A tuple containing the train, validation, and test datasets.
+    """
+
+
+    all_images = image_data
+
+    n_total_samples = len(all_images)
+    # split into train, val, test
+    n_train_samples = int(n_total_samples * 0.8)
+    n_val_samples = int(n_total_samples * 0.1)
+    train_images = all_images[:n_train_samples]
+    val_images = all_images[n_train_samples:n_train_samples + n_val_samples]
+    test_images = all_images[n_train_samples + n_val_samples:] # will have remaining 10% of data since we are using 90% for train and val
+
+
+    # stack the images and labels
+    float_train_labels = [float(sample[1]) for sample in train_images]
+    float_val_labels = [float(sample[1]) for sample in val_images]
+    float_test_labels = [float(sample[1]) for sample in test_images]
+
+    train_images = torch.stack([TRANSFORM(sample[0]) for sample in train_images])
+    train_labels = torch.tensor(float_train_labels)
+    val_images = torch.stack([TRANSFORM(sample[0]) for sample in val_images])
+    val_labels = torch.tensor(float_val_labels)
+    test_images = torch.stack([TRANSFORM(sample[0]) for sample in test_images])
+    test_labels = torch.tensor(float_test_labels)
+
+    return FireDataset(train_images, train_labels), FireDataset(val_images, val_labels), FireDataset(test_images, test_labels) 
+
+def get_image_data(n_total_samples = 1000) -> Tuple[FireDataset, FireDataset, FireDataset]:
+    """
+    Generate random data for training and testing. Apply preprocessing to the images as well using TRANSFORM.
     60/20/20 split for train/validation/test
     Args:
         n_total_samples (int): Total number of samples to generate.
     Returns:
-        Tuple[ImageData, ImageData, ImageData]: Tuple of train, validation, and test data.
-        Each data set is a list of tuples, where each tuple contains an image tensor and a boolean (True if fire, False if no fire).
+        ImageData: A list of tuples containing the unprocessed image tensors and their corresponding labels.
     """
 
     
@@ -138,21 +268,14 @@ def get_image_data(n_total_samples = 1000) -> Tuple[ImageData, ImageData, ImageD
     all_images = fire_images + nofire_images
     random.shuffle(all_images)
 
-    # split into train, val, test
-    n_train_samples = int(n_total_samples * 0.6)
-    n_val_samples = int(n_total_samples * 0.2)
-    train_images = all_images[:n_train_samples]
-    val_images = all_images[n_train_samples:n_train_samples + n_val_samples]
-    test_images = all_images[n_train_samples + n_val_samples:] # will have remaining 20% of data since we are using 80% for train and val
-
-    return train_images, val_images, test_images
+    return all_images
 
 
-def display_images(image_data: ImageData, num_images: int = 5, title = "Random Sample of Images"):
+def display_images(image_data: FireDataset, num_images: int = 5, title = "Random Sample of Images"):
     """
     Display random sample of a list of image tensors
     Args:
-        image_data (ImageData): List of image tensors.
+        image_data (FireDataset): List of image tensors.
         num_images (int): Number of images to display.
         title (str): Title for the plot.
     
@@ -170,7 +293,7 @@ def display_images(image_data: ImageData, num_images: int = 5, title = "Random S
 
     for i in range(num_images):
         img_tensor, is_fire = image_data[random_indices[i]]
-        axes[i].imshow(F.to_pil_image(img_tensor))
+        axes[i].imshow(torchvision.transforms.functional.to_pil_image(img_tensor))
         axes[i].set_title("Fire" if is_fire else "No Fire")
         axes[i].axis('off')
     plt.show()
