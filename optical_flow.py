@@ -1,3 +1,10 @@
+"""
+Adithya Palle
+Mar 31, 2025
+Final Project
+
+File containing functionality for computing optical flow between two frames and using it to predict fire probability.
+"""
 from video_model import VideoModel
 import cv2
 import numpy as np
@@ -30,7 +37,6 @@ def draw_flow_on_white(flow, shape, step=16):
     return white_bg
 class FarnebackOpticalFlowModel(VideoModel):
 
-    # TODO: address weakness when there are lots of other moving obejcts in the scene (maybe feed to classifier such as LR)
     def predict_on_last_frame(self, frames : list[torch.Tensor]) -> float:
         """
         Predicts the fire probability for the last frame in the given stream of images using Farneback Optical Flow.

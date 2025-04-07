@@ -70,11 +70,6 @@ class TrainingModel(torch.nn.Module):
         dropout_prob = 0.5
 
         fc_nodes = 64
-        # TODO: rearchitectu model to use dropout, and not be a copy of source 150 
-        # things to try: - skip connections, residual connections, batch normalization, dropout
-        # change train /test/val to 80/10/10
-        # try different hyperparameters
-        # try not to shrink all the way to 1 feature map, have more fully connected nodes
 
         self.convolutional_layers = torch.nn.Sequential(
             torch.nn.Conv2d(3, conv_channels, kernel_size=conv_kernel_size, stride=conv_stride, padding = conv_padding),

@@ -1,3 +1,11 @@
+"""
+Adithya Palle
+Mar 31, 2025
+Final Project
+
+File containing functionality to load image and video data or training and evaluating models.
+"""
+
 from typing import Tuple, List
 import torch
 import torchvision.io
@@ -6,7 +14,6 @@ import matplotlib.pyplot as plt
 import torch.nn.functional as F
 from torchvision import transforms
 import random
-import dataclasses
 from torch.utils.data import Dataset
 
 PLACES_DATA_PATH = "data/data_256"
@@ -27,7 +34,6 @@ TRANSFORM = transforms.Compose([
                                 # normalize based on ImageNet mean and std
                                 transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                                     std=[0.229, 0.224, 0.225])])
-# TODO: consider recalcualating mean and std for the dataset if these do not work well
 
 
 # size that we resize the images (square) to before passing to the model
@@ -171,7 +177,7 @@ def display_video(video_tensor: torch.Tensor, num_frames: int = 5):
     fig, axes = plt.subplots(1, num_frames, figsize=(15, 5))
     for i in range(num_frames):
         frame = video_tensor[i] #
-        axes[i].imshow(frame)
+        axes[i].imshow(frame.permute(1, 2, 0).numpy())  # Convert to HWC format for display
         axes[i].axis('off')
     plt.show()
 
@@ -236,7 +242,7 @@ def preprocess_data(image_data: ImageData) -> Tuple[FireDataset, FireDataset, Fi
 
     return FireDataset(train_images, train_labels), FireDataset(val_images, val_labels), FireDataset(test_images, test_labels) 
 
-def get_image_data(n_total_samples = 1000) -> Tuple[FireDataset, FireDataset, FireDataset]:
+def get_image_data(n_total_samples = 1000) -> ImageData:
     """
     Generate random data for training and testing. Apply preprocessing to the images as well using TRANSFORM.
     60/20/20 split for train/validation/test
