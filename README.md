@@ -63,4 +63,4 @@ Here is a [link](https://drive.google.com/drive/folders/1GLSxCgdm0lU-UBnkRTfptQr
 
 ## Presentation
 
-Here is a link to a presentation on this project.
+Here is a [link](https://drive.google.com/file/d/16sRol7EeTIBAhchTKhK_mGw3GRnPg4_p/view?usp=sharing) to a presentation on this project, and [here](https://docs.google.com/presentation/d/15bZosdHpCtiMaM-oO2DC7kbykrmH8jiX7Jp11m3d2xY/edit?usp=sharing) is the slide deck.
