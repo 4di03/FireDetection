@@ -5,8 +5,17 @@ Adithya Palle
 
 ## Project Description
 
-
-
+Detecting fires rapidly in both indoor and outdoor
+environments is essential for minimizing damage and ensuring
+timely response. We implement two vision-based models that predict
+the presence of fire in each frame of a real-time video feed.
+The first is a lightweight convolutional neural network (CNN)
+inspired by AlexNet. The second is an optical flow-
+based model which calculates the percentage of flow in flame-
+colored regions. We evaluate both models on a test set of videos 
+and determine the recall, false positive rate, and performance (in frames per second).
+We aim to create a lightweight model that can run on CPU-only devices
+and achieve a high recall in classifiying images as fire or no-fire.
 
 ## Data
 
@@ -54,3 +63,4 @@ Here is a [link](https://drive.google.com/drive/folders/1GLSxCgdm0lU-UBnkRTfptQr
 
 ## Presentation
 
+Here is a link to a presentation on this project.
