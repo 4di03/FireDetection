@@ -13,8 +13,7 @@ The first is a lightweight convolutional neural network (CNN)
 inspired by AlexNet. The second is an optical flow-
 based model which calculates the percentage of flow in flame-
 colored regions. We evaluate both models on a test set of videos 
-and determine the recall, false positive rate, and performance (in frames per second).
-We aim to create a lightweight model that can run on CPU-only devices
+and determine the recall, false positive rate, and performance (in frames per second). We aim to create a lightweight model that can run on CPU-only devices
 and achieve a high recall in classifiying images as fire or no-fire.
 
 ## Data
