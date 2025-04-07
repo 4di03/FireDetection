@@ -2,20 +2,36 @@
 
 ## Group Members
 Adithya Palle
+
+## Project Description
+
+
+
+
 ## Data
 
-To run the notebooks, you may need the appropriate data in your data folder. 
+To run the notebooks, you will need the appropriate data in your data folder. 
 
- TODO: add googel drive links to data
+Below are the sources for the datasets required in `data_extraction.py`.
+
+The Places365 needed for `PLACES_DATA_PATH`, you can find it [here](https://github.com/CSAILVision/places365).
+
+The Fire videos validaiton and test data for `FIRE_VIDEOS_DATA_PATH` can be downloaded here.
+
+The Fire image dataset for `FIRE_IMAGE_DATA_PATH` can be found [here](https://universe.roboflow.com/fire-dataset-tp9jt/fire-detection-sejra/dataset/1).
 
 
- After this, rearrange the files such that the paths in `data_extraction.py` point to the right directories and have data in them.
+`TENSOR_CACHE_PATH` should be initialized empty and will be filled with cached tensors when you run data extraction code.
+
+Make sure to instal this data in the data folder and with the appropriate folder names as specified by the constants in `data_extraction.py`.
 
 ## Local Setup
 
 MacOS Sequoia 15.2 - Arm64 
 Visual Studio Code
 Python 3.10.16
+
+Find pip dependences in `requirements.txt`
 
 
 To train the CNN, simply modify the model structure in TrainingModel.__init__ and then run the `train_cnn.ipynb` notebook after changing `MODEL_NAME` 
